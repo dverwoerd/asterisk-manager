@@ -475,6 +475,12 @@ class AsteriskConfig
             $out .= " same => n,Hangup()\n\n";
         }
 
+        // Hints voor BLF/presence per extensie
+        foreach ($extensions as $ext) {
+            $out .= 'exten => ' . $ext['extension'] . ",hint,PJSIP/" . $ext['extension'] . "\n";
+        }
+        $out .= "\n";
+
         // Ring Groups
         foreach ($ringGroups as $rg) {
             $members   = Database::fetchAll(

@@ -16,7 +16,7 @@
             </div>
             <div class="form-row">
                 <div class="form-group"><label>Billing Increment (sec)</label><input type="number" name="billing_increment" class="form-control" value="<?= (int)$rate['billing_increment'] ?>" min="1" max="3600"></div>
-                <div class="form-group"><label>Notes</label><input type="text" name="notes" class="form-control" value="<?= sanitize($rate['notes']) ?>"></div>
+                <div class="form-group"><label>Notes</label><input type="text" name="notes" class="form-control" value="<?= sanitize($rate['notes'] ?? '') ?>"></div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label>Valid From (time)</label><input type="time" name="time_start" class="form-control" value="<?= $rate['time_start'] ?? '00:00:00' ?>"></div>

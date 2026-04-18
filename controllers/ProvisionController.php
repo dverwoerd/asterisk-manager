@@ -207,14 +207,7 @@ class ProvisionController extends BaseController
             $ami = AsteriskAMI::fromSettings();
             if ($ami->connect()) {
                 // Stuur SIP NOTIFY check-sync;reboot=true naar het endpoint
-                $result = $ami->sendRawCommand(
-                    "Action: PJSIPNotify
-" .
-                    "Endpoint: " . $phone['extension'] . "
-" .
-                    "Variable: Event=check-sync;reboot=true
-"
-                );
+                $ami->rebootEndpoint($phone['extension']);
                 $ami->disconnect();
                 $this->flash('success', 'Reboot commando verzonden naar extensie ' . $phone['extension'] . '.');
             } else {
