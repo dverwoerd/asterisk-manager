@@ -427,7 +427,7 @@ class ProvisionController extends BaseController
         $ini .= "audioInputDevice=\"\"\n";
         $ini .= "micAmplification=0\n";
         $ini .= "swLevelAdjustment=0\n";
-        $ini .= "audioCodecs=G722/16000/1,PCMA/8000/1,PCMU/8000/1\n";
+        $ini .= "audioCodecs=PCMA/8000/1 PCMU/8000/1 G722/16000/1\n";
         $ini .= "VAD=0\n";
         $ini .= "EC=1\n";
         $ini .= "forceCodec=0\n";
