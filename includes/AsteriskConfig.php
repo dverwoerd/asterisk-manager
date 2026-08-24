@@ -398,6 +398,8 @@ class AsteriskConfig
         $out .= 'announce-position=' . $queue['announce_position'] . "\n";
         $out .= 'announce-frequency=' . $queue['announce_frequency'] . "\n";
         $out .= 'musicclass=' . $queue['music_on_hold'] . "\n";
+        $out .= 'language=' . (getSetting('queue_language', 'nl') ?: 'nl') . "\n";
+        $out .= 'periodic-announce-frequency=' . ((int)($queue['announce_frequency'] ?? 30)) . "\n";
         if (!empty($queue['join_announcement'])) {
             $out .= 'announce=' . $queue['join_announcement'] . "\n";
         }
