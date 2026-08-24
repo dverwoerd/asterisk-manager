@@ -26,10 +26,16 @@ class DashboardController extends BaseController
         try {
             $ami = AsteriskAMI::fromSettings();
             if ($ami->connect()) {
-                $coreSettings   = $ami->getCoreSettings();
-                $amiStatus      = [
+                // Haal versie op via CLI
+                $version = trim(shell_exec('sudo /usr/sbin/asterisk -rx "core show version" 2>/dev/null | head -1') ?? '');
+                if (preg_match('/Asterisk ([\d.]+)/', $version, $m)) {
+                    $version = 'Asterisk ' . $m[1];
+                } else {
+                    $version = 'Unknown';
+                }
+                $amiStatus = [
                     'connected' => true,
-                    'version'   => $coreSettings['AsteriskVersion'] ?? 'Unknown',
+                    'version'   => $version,
                 ];
                 $channels       = $ami->getChannels();
                 $activeChannels = max(0, count($channels) - 2);

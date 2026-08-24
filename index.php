@@ -29,7 +29,7 @@ if (empty($_SESSION['csrf_token'])) {
 $page   = $_GET['page'] ?? 'dashboard';
 $action = $_GET['action'] ?? 'index';
 
-if ($page !== 'login' && $page !== 'logout' && !($page === 'phonebook' && $action === 'xml') && !isLoggedIn()) {
+if ($page !== 'login' && $page !== 'logout' && !($page === 'phonebook' && $action === 'xml') && !($page === 'sounds' && $action === 'list') && !isLoggedIn()) {
     redirect('?page=login');
 }
 
@@ -51,6 +51,7 @@ $routes = [
     'provision'       => 'ProvisionController',
     'phonebook'       => 'PhonebookController',
     'security'        => 'SecurityController',
+    'sounds'          => 'SoundsController',
     'login'           => 'AuthController',
     'logout'          => 'AuthController',
 ];

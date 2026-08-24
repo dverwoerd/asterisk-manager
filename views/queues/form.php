@@ -66,8 +66,91 @@
                     </div>
                     <div class="form-group">
                         <label>Join Announcement (sound file)</label>
-                        <input type="text" name="join_announcement" class="form-control mono" value="<?= sanitize($queue['join_announcement']) ?>" placeholder="e.g. queue-thankyou">
+                        <div style="display:flex;gap:8px">
+                            <input type="text" name="join_announcement" id="join_announcement"
+                                   class="form-control mono"
+                                   value="<?= sanitize($queue['join_announcement']) ?>"
+                                   placeholder="bijv. queue-thankyou of custom/welkom">
+                            <button type="button" class="btn btn-ghost" onclick="openSoundPicker('join_announcement')">🔊 Kies</button>
+                        </div>
+                        <small class="form-hint">Laat leeg voor geen aankondiging. Gebruik <code>custom/bestandsnaam</code> voor eigen bestanden.</small>
                     </div>
+                    <div class="form-group">
+                        <label>Music on Hold</label>
+                        <div style="display:flex;gap:8px">
+                            <input type="text" name="music_on_hold" id="music_on_hold_field"
+                                   class="form-control mono"
+                                   value="<?= sanitize($queue['music_on_hold'] ?? 'default') ?>">
+                            <button type="button" class="btn btn-ghost" onclick="openSoundPicker('music_on_hold_field')">🔊 Kies</button>
+                        </div>
+                    </div>
+
+                    <!-- Sound Picker Modal -->
+                    <div id="soundPickerModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+                        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:600px;max-height:80vh;display:flex;flex-direction:column">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                                <h3 style="margin:0">🔊 Kies een Soundfile</h3>
+                                <button type="button" onclick="closeSoundPicker()" class="btn btn-ghost btn-sm">✕</button>
+                            </div>
+                            <input type="text" id="soundSearch" class="form-control mono" placeholder="Zoek..." oninput="filterSounds()" style="margin-bottom:12px">
+                            <div style="display:flex;gap:8px;margin-bottom:12px">
+                                <button type="button" class="btn btn-sm btn-ghost" onclick="loadSounds('en')">EN</button>
+                                <button type="button" class="btn btn-sm btn-ghost" onclick="loadSounds('nl')">NL</button>
+                                <button type="button" class="btn btn-sm btn-accent" onclick="loadSounds('custom')">Custom</button>
+                            </div>
+                            <div id="soundList" style="overflow-y:auto;flex:1;display:grid;grid-template-columns:1fr 1fr;gap:4px"></div>
+                        </div>
+                    </div>
+
+                    <script>
+                    let currentField = null;
+                    let currentPrefix = '';
+
+                    function openSoundPicker(fieldId) {
+                        currentField = fieldId;
+                        document.getElementById('soundPickerModal').style.display = 'flex';
+                        loadSounds('en');
+                    }
+
+                    function closeSoundPicker() {
+                        document.getElementById('soundPickerModal').style.display = 'none';
+                    }
+
+                    function loadSounds(lang) {
+                        currentPrefix = lang === 'custom' ? 'custom/' : '';
+                        fetch('?page=sounds&action=list&lang=' + lang)
+                            .then(r => r.json())
+                            .then(data => {
+                                const sounds = lang === 'custom' ? data.custom : data.sounds;
+                                renderSounds(sounds, currentPrefix);
+                            });
+                    }
+
+                    function renderSounds(sounds, prefix) {
+                        const list = document.getElementById('soundList');
+                        list.innerHTML = sounds.map(s =>
+                            `<div class="sound-item mono" style="padding:6px 10px;border-radius:4px;cursor:pointer;background:var(--bg-secondary);font-size:12px"
+                                  onclick="selectSound('${prefix}${s}')">${prefix}${s}</div>`
+                        ).join('');
+                    }
+
+                    function selectSound(name) {
+                        document.getElementById(currentField).value = name;
+                        closeSoundPicker();
+                    }
+
+                    function filterSounds() {
+                        const q = document.getElementById('soundSearch').value.toLowerCase();
+                        document.querySelectorAll('.sound-item').forEach(el => {
+                            el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+                        });
+                    }
+
+                    // Sluit modal bij klik buiten
+                    document.getElementById('soundPickerModal').addEventListener('click', function(e) {
+                        if (e.target === this) closeSoundPicker();
+                    });
+                    </script>
                     <div class="form-group">
                         <label>Caller ID Prefix</label>
                         <input type="text" name="caller_id_prefix" class="form-control mono" value="<?= sanitize($queue['caller_id_prefix']) ?>" placeholder="e.g. [Support] ">

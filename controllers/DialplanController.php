@@ -97,6 +97,7 @@ class DialplanController extends BaseController
             $cfg->generatePJSIP();
             $cfg->generateQueues();
             $cfg->generateDialplan();
+            $cfg->generateVoicemail();
             $ok = $cfg->reload();
             $this->flash($ok ? 'success' : 'danger', t($ok ? 'reload_success' : 'reload_failed'));
         } catch (Exception $e) {

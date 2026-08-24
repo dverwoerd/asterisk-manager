@@ -53,7 +53,7 @@ class TrunksController extends BaseController
     {
         return [
             'name' => trim($this->post('name','')),
-            'trunk_type' => \$this->post('trunk_type','provider'),
+            'trunk_type' => $this->post('trunk_type','provider'),
             'type' => $this->post('type','pjsip'),
             'host' => trim($this->post('host','')),
             'port' => (int)$this->post('port',5060),

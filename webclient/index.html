@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PBX Webclient</title>
+<script src="jssip.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0a0e1a;
+    color: #f1f5f9;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.phone {
+    background: #111827;
+    border: 1px solid #1e2a3a;
+    border-radius: 20px;
+    width: 360px;
+    padding: 24px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+}
+.phone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.phone-title { font-size:14px; font-weight:600; color:#94a3b8; letter-spacing:2px; text-transform:uppercase; }
+.status-dot { width:10px; height:10px; border-radius:50%; background:#ef4444; transition:background 0.3s; }
+.status-dot.connected { background:#22c55e; }
+.status-dot.calling { background:#f59e0b; animation:pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.user-info {
+    background:#0d1117; border:1px solid #1e2a3a; border-radius:10px;
+    padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px;
+}
+.user-avatar {
+    width:40px; height:40px; border-radius:50%; background:#00d4aa;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; color:#0a0e1a; font-weight:bold; flex-shrink:0;
+}
+.user-name { font-size:13px; font-weight:600; }
+.user-ext  { font-size:11px; color:#64748b; font-family:monospace; }
+
+.status-selector { display:flex; gap:6px; margin-bottom:16px; }
+.status-btn {
+    flex:1; padding:7px; border:1px solid #1e2a3a; border-radius:8px;
+    background:#0d1117; color:#94a3b8; font-size:11px; cursor:pointer; text-align:center; transition:all 0.2s;
+}
+.status-btn.s-free    { border-color:#22c55e; background:rgba(34,197,94,0.1); color:#22c55e; }
+.status-btn.s-busy    { border-color:#ef4444; background:rgba(239,68,68,0.1); color:#ef4444; }
+.status-btn.s-forward { border-color:#f59e0b; background:rgba(245,158,11,0.1); color:#f59e0b; }
+
+.display {
+    background:#0d1117; border:1px solid #1e2a3a; border-radius:10px;
+    padding:16px; margin-bottom:16px; min-height:64px;
+}
+.display-number { font-size:24px; font-family:monospace; color:#f1f5f9; letter-spacing:2px; min-height:32px; }
+.display-status { font-size:11px; color:#64748b; margin-top:4px; }
+
+.keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+.key {
+    background:#0d1117; border:1px solid #1e2a3a; border-radius:10px;
+    padding:14px; text-align:center; cursor:pointer; transition:all 0.15s; user-select:none;
+}
+.key:hover  { background:#1e2a3a; }
+.key:active { transform:scale(0.95); border-color:#00d4aa; }
+.key-num { font-size:18px; font-weight:600; }
+.key-sub { font-size:8px; color:#64748b; letter-spacing:1px; }
+
+.action-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:8px; }
+.btn {
+    padding:12px; border-radius:10px; border:none; cursor:pointer; font-size:18px; transition:all 0.2s;
+}
+.btn-green { background:#22c55e; color:white; }
+.btn-green:hover { background:#16a34a; }
+.btn-red   { background:#ef4444; color:white; }
+.btn-red:hover { background:#dc2626; }
+.btn-gray  { background:#1e2a3a; color:#94a3b8; }
+.btn-gray:hover { background:#334155; }
+.btn-gray.active { background:rgba(239,68,68,0.2); color:#ef4444; }
+
+.audio-select {
+    width:100%; background:#0d1117; border:1px solid #1e2a3a; border-radius:8px;
+    padding:8px 12px; color:#94a3b8; font-size:12px; margin-bottom:16px;
+}
+
+.blf-title { font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+.blf-list  { display:flex; flex-direction:column; gap:6px; }
+.blf-item {
+    display:flex; align-items:center; gap:10px; padding:8px 12px;
+    background:#0d1117; border:1px solid #1e2a3a; border-radius:8px;
+    cursor:pointer; transition:all 0.2s;
+}
+.blf-item:hover { border-color:#334155; }
+.blf-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.blf-dot.free     { background:#22c55e; }
+.blf-dot.busy     { background:#ef4444; }
+.blf-dot.ringing  { background:#f59e0b; animation:pulse 0.5s infinite; }
+.blf-dot.offline  { background:#374151; }
+.blf-name { font-size:12px; flex:1; }
+.blf-ext  { font-size:10px; color:#64748b; font-family:monospace; }
+
+/* Login */
+.login-title { font-size:20px; font-weight:600; margin-bottom:6px; text-align:center; }
+.login-sub   { font-size:12px; color:#64748b; margin-bottom:20px; text-align:center; }
+.form-group  { margin-bottom:12px; }
+.form-group label { font-size:11px; color:#64748b; display:block; margin-bottom:4px; }
+.form-input  {
+    width:100%; background:#0d1117; border:1px solid #1e2a3a; border-radius:8px;
+    padding:10px 12px; color:#f1f5f9; font-size:13px;
+}
+.form-input:focus { outline:none; border-color:#00d4aa; }
+.btn-login {
+    width:100%; background:#00d4aa; color:#0a0e1a; border:none;
+    border-radius:8px; padding:12px; font-size:13px; font-weight:600; cursor:pointer; margin-top:8px;
+}
+.btn-login:hover { background:#00b894; }
+.error-msg { color:#ef4444; font-size:11px; margin-top:8px; text-align:center; min-height:16px; }
+
+.hidden { display:none !important; }
+.sep { border-top:1px solid #1e2a3a; margin:16px 0; }
+</style>
+</head>
+<body>
+<div class="phone">
+
+    <!-- LOGIN -->
+    <div id="loginScreen">
+        <div style="text-align:center;font-size:32px;margin-bottom:12px">⬡</div>
+        <div class="login-title">PBX Webclient</div>
+        <div class="login-sub">Verbind met uw toestel</div>
+        <div class="form-group">
+            <label>SIP Server</label>
+            <input id="cfgServer" type="text" class="form-input" value="pbx.clearvoip.nl">
+        </div>
+        <div class="form-group">
+            <label>Extensie</label>
+            <input id="cfgExt" type="text" class="form-input" placeholder="104">
+        </div>
+        <div class="form-group">
+            <label>Wachtwoord</label>
+            <input id="cfgPass" type="password" class="form-input" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+            <label>🎧 Microfoon / Headset</label>
+            <select id="cfgAudio" class="audio-select"></select>
+        </div>
+        <button class="btn-login" onclick="doConnect()">Verbinden →</button>
+        <div id="loginErr" class="error-msg"></div>
+    </div>
+
+    <!-- TELEFOON -->
+    <div id="phoneScreen" class="hidden">
+
+        <div class="phone-header">
+            <span class="phone-title">PBX Webclient</span>
+            <div style="display:flex;align-items:center;gap:8px">
+                <div id="connDot" class="status-dot"></div>
+                <span id="connTxt" style="font-size:10px;color:#64748b">-</span>
+            </div>
+        </div>
+
+        <div class="user-info">
+            <div class="user-avatar" id="uAvatar">?</div>
+            <div>
+                <div class="user-name" id="uName">-</div>
+                <div class="user-ext" id="uExt">-</div>
+            </div>
+            <button onclick="doDisconnect()" style="margin-left:auto;background:none;border:none;color:#64748b;cursor:pointer;font-size:16px" title="Uitloggen">⏻</button>
+        </div>
+
+        <div class="status-selector">
+            <div id="sFree"    class="status-btn s-free" onclick="setPresence('free')">🟢 Vrij</div>
+            <div id="sBusy"   class="status-btn"         onclick="setPresence('busy')">🔴 Bezet</div>
+            <div id="sFwd"    class="status-btn"         onclick="setPresence('forward')">🟠 Doorsch.</div>
+        </div>
+
+        <select id="audioOut" class="audio-select" onchange="switchAudio()">
+            <option>🎧 Standaard microfoon</option>
+        </select>
+
+        <div class="display">
+            <div id="dispNum" class="display-number"></div>
+            <div id="dispSts" class="display-status">Gereed om te bellen</div>
+        </div>
+
+        <div class="keypad">
+            <div class="key" onclick="key('1')"><div class="key-num">1</div></div>
+            <div class="key" onclick="key('2')"><div class="key-num">2</div><div class="key-sub">ABC</div></div>
+            <div class="key" onclick="key('3')"><div class="key-num">3</div><div class="key-sub">DEF</div></div>
+            <div class="key" onclick="key('4')"><div class="key-num">4</div><div class="key-sub">GHI</div></div>
+            <div class="key" onclick="key('5')"><div class="key-num">5</div><div class="key-sub">JKL</div></div>
+            <div class="key" onclick="key('6')"><div class="key-num">6</div><div class="key-sub">MNO</div></div>
+            <div class="key" onclick="key('7')"><div class="key-num">7</div><div class="key-sub">PQRS</div></div>
+            <div class="key" onclick="key('8')"><div class="key-num">8</div><div class="key-sub">TUV</div></div>
+            <div class="key" onclick="key('9')"><div class="key-num">9</div><div class="key-sub">WXYZ</div></div>
+            <div class="key" onclick="key('*')"><div class="key-num">*</div></div>
+            <div class="key" onclick="key('0')"><div class="key-num">0</div></div>
+            <div class="key" onclick="key('#')"><div class="key-num">#</div></div>
+        </div>
+
+        <div class="action-row">
+            <button id="btnMute" class="btn btn-gray" onclick="toggleMute()" title="Mute">🎤</button>
+            <button id="btnCall" class="btn btn-green" onclick="actionCall()" title="Bellen">📞</button>
+            <button id="btnHold" class="btn btn-gray" onclick="toggleHold()" title="Wacht">⏸</button>
+        </div>
+        <div class="action-row">
+            <button class="btn btn-gray" onclick="backspace()" title="Wis">⌫</button>
+            <button id="btnHang" class="btn btn-red hidden" onclick="doHangup()" title="Ophangen">📵</button>
+            <button class="btn btn-gray" onclick="clearDial()" title="Alles wis">✕</button>
+        </div>
+
+        <div class="sep"></div>
+        <div class="blf-title">👥 Collega's</div>
+        <div id="blfList" class="blf-list">
+            <div style="font-size:11px;color:#64748b">Laden...</div>
+        </div>
+
+    </div>
+</div>
+
+<audio id="remoteAudio" autoplay></audio>
+
+<script>
+// ============================================================
+// PBX Webclient — JsSIP WebRTC Client
+// ============================================================
+let ua        = null;
+let session   = null;
+let muted     = false;
+let onHold    = false;
+let dialStr   = '';
+let myExt     = '';
+let blfTimer  = null;
+
+// ---- Audio devices ----
+async function loadAudioDevices(selId) {
+    try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        const mics = devs.filter(d => d.kind === 'audioinput');
+        const sel  = document.getElementById(selId);
+        sel.innerHTML = '';
+        mics.forEach((d, i) => {
+            const o = document.createElement('option');
+            o.value = d.deviceId;
+            o.textContent = '🎧 ' + (d.label || 'Microfoon ' + (i+1));
+            sel.appendChild(o);
+        });
+    } catch(e) { console.warn('Audio:', e); }
+}
+
+// ---- Verbinden ----
+function doConnect() {
+    const server = document.getElementById('cfgServer').value.trim();
+    const ext    = document.getElementById('cfgExt').value.trim();
+    const pass   = document.getElementById('cfgPass').value;
+    const errEl  = document.getElementById('loginErr');
+
+    if (!ext || !pass) { errEl.textContent = 'Vul extensie en wachtwoord in.'; return; }
+    errEl.textContent = 'Verbinden...';
+
+    const socket = new JsSIP.WebSocketInterface('wss://' + server + '/ws');
+
+    const config = {
+        sockets:            [socket],
+        uri:                'sip:' + ext + '@' + server,
+        password:           pass,
+        register:           true,
+        register_expires:   300,
+        session_timers:     false,
+        use_preloaded_route: false,
+    };
+
+    JsSIP.debug.enable('JsSIP:*');
+
+    try {
+        ua = new JsSIP.UA(config);
+    } catch(e) {
+        errEl.textContent = 'Configuratie fout: ' + e.message;
+        return;
+    }
+
+    ua.on('connecting', () => {
+        setConn(false, 'Verbinden...');
+    });
+
+    ua.on('connected', () => {
+        setConn(false, 'Verbonden...');
+    });
+
+    ua.on('disconnected', () => {
+        setConn(false, 'Verbinding verbroken');
+    });
+
+    ua.on('registered', () => {
+        myExt = ext;
+        setConn(true, 'Geregistreerd');
+        errEl.textContent = '';
+
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('phoneScreen').classList.remove('hidden');
+        document.getElementById('uName').textContent = 'Extensie ' + ext;
+        document.getElementById('uExt').textContent  = 'ext. ' + ext;
+        document.getElementById('uAvatar').textContent = ext.charAt(0);
+
+        loadAudioDevices('audioOut');
+        loadBLF();
+        blfTimer = setInterval(loadBLF, 10000);
+    });
+
+    ua.on('unregistered', () => {
+        setConn(false, 'Niet geregistreerd');
+    });
+
+    ua.on('registrationFailed', (e) => {
+        errEl.textContent = 'Registratie mislukt: ' + (e.cause || 'onbekend');
+        ua.stop();
+        ua = null;
+    });
+
+    ua.on('newRTCSession', (data) => {
+        const s = data.session;
+
+        if (s.direction === 'incoming') {
+            handleIncoming(s);
+        }
+
+        s.on('ended',  resetCall);
+        s.on('failed', resetCall);
+
+        s.on('confirmed', () => {
+            setStatus('✅ In gesprek');
+            document.getElementById('btnHang').classList.remove('hidden');
+        });
+    });
+
+    ua.start();
+}
+
+function doDisconnect() {
+    clearInterval(blfTimer);
+    if (ua) { ua.stop(); ua = null; }
+    session = null;
+    document.getElementById('phoneScreen').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+// ---- Inkomende oproep ----
+function handleIncoming(s) {
+    session = s;
+    const caller = s.remote_identity.uri.user;
+    setDialDisplay(caller);
+    setStatus('📞 Inkomende oproep van ' + caller);
+    document.getElementById('btnCall').textContent = '✅';
+    document.getElementById('btnCall').title = 'Beantwoorden';
+    document.getElementById('btnHang').classList.remove('hidden');
+    s.on('peerconnection', (d) => setupAudio(d.peerconnection));
+}
+
+// ---- Bellen / Beantwoorden ----
+function actionCall() {
+    if (!ua) return;
+
+    // Beantwoord inkomende
+    if (session && session.direction === 'incoming' &&
+        (session.status === JsSIP.RTCSession.C.STATUS_WAITING_FOR_ANSWER)) {
+        session.answer({
+            mediaConstraints: { audio: true, video: false },
+            pcConfig: { iceServers: [] }
+        });
+        document.getElementById('btnCall').textContent = '📞';
+        return;
+    }
+
+    if (!dialStr) return;
+
+    const server  = document.getElementById('cfgServer').value.trim();
+    const target  = 'sip:' + dialStr + '@' + server;
+
+    const options = {
+        mediaConstraints: { audio: true, video: false },
+        pcConfig: { iceServers: [] },
+        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
+    };
+
+    session = ua.call(target, options);
+
+    session.on('peerconnection', (d) => setupAudio(d.peerconnection));
+    session.on('progress',  () => setStatus('📞 Bellen...'));
+    session.on('accepted',  () => { setStatus('✅ In gesprek'); document.getElementById('btnHang').classList.remove('hidden'); });
+    session.on('ended',     resetCall);
+    session.on('failed',    (e) => { setStatus('❌ ' + (e.cause || 'Mislukt')); resetCall(); });
+}
+
+function doHangup() {
+    if (!session) return;
+    try { session.terminate(); } catch(e) {}
+    resetCall();
+}
+
+function setupAudio(pc) {
+    // JsSIP manier - luister naar track events
+    pc.addEventListener('track', (e) => {
+        console.log('Track ontvangen:', e.track.kind, e.streams.length);
+        if (e.track.kind === 'audio') {
+            const audio = document.getElementById('remoteAudio');
+            if (e.streams && e.streams[0]) {
+                audio.srcObject = e.streams[0];
+            } else {
+                const stream = new MediaStream([e.track]);
+                audio.srcObject = stream;
+            }
+            audio.play().catch(e => console.warn('Audio play:', e));
+        }
+    });
+
+    // Controleer bestaande tracks
+    pc.getReceivers().forEach(receiver => {
+        if (receiver.track && receiver.track.kind === 'audio') {
+            console.log('Bestaande audio track gevonden');
+            const stream = new MediaStream([receiver.track]);
+            document.getElementById('remoteAudio').srcObject = stream;
+            document.getElementById('remoteAudio').play().catch(e => console.warn(e));
+        }
+    });
+}
+
+function resetCall() {
+    session = null;
+    muted   = false;
+    onHold  = false;
+    setStatus('Gereed om te bellen');
+    document.getElementById('btnHang').classList.add('hidden');
+    document.getElementById('btnCall').textContent = '📞';
+    document.getElementById('btnCall').title = 'Bellen';
+    document.getElementById('btnMute').classList.remove('active');
+    document.getElementById('btnHold').classList.remove('active');
+    document.getElementById('connDot').className = 'status-dot connected';
+}
+
+// ---- Mute / Hold ----
+function toggleMute() {
+    if (!session) return;
+    muted = !muted;
+    muted ? session.mute() : session.unmute();
+    document.getElementById('btnMute').classList.toggle('active', muted);
+    document.getElementById('btnMute').textContent = muted ? '🔇' : '🎤';
+}
+
+function toggleHold() {
+    if (!session) return;
+    onHold = !onHold;
+    onHold ? session.hold() : session.unhold();
+    document.getElementById('btnHold').classList.toggle('active', onHold);
+    setStatus(onHold ? '⏸ In wacht' : '✅ In gesprek');
+}
+
+// ---- Keypad ----
+function key(k) {
+    dialStr += k;
+    document.getElementById('dispNum').textContent = dialStr;
+    if (session && session.isEstablished()) {
+        session.sendDTMF(k);
+    }
+}
+
+function backspace() {
+    dialStr = dialStr.slice(0, -1);
+    document.getElementById('dispNum').textContent = dialStr;
+}
+
+function clearDial() {
+    dialStr = '';
+    document.getElementById('dispNum').textContent = '';
+}
+
+function setDialDisplay(num) {
+    dialStr = num;
+    document.getElementById('dispNum').textContent = num;
+}
+
+// ---- Status / Aanwezigheid ----
+function setPresence(s) {
+    ['Free','Busy','Fwd'].forEach(x =>
+        document.getElementById('s'+x).className = 'status-btn'
+    );
+    const map = { free:'sFree s-free', busy:'sBusy s-busy', forward:'sFwd s-forward' };
+    const ids = { free:'sFree', busy:'sBusy', forward:'sFwd' };
+    document.getElementById(ids[s]).className = 'status-btn ' + map[s].split(' ')[1];
+}
+
+function setStatus(txt) {
+    document.getElementById('dispSts').textContent = txt;
+}
+
+function setConn(ok, txt) {
+    document.getElementById('connDot').className = 'status-dot' + (ok ? ' connected' : '');
+    document.getElementById('connTxt').textContent = txt;
+}
+
+// ---- Audio wisselen ----
+async function switchAudio() {
+    const deviceId = document.getElementById('audioOut').value;
+    if (!deviceId || !session) return;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { deviceId: { exact: deviceId } }
+        });
+        const sender = session.connection?.getSenders().find(s => s.track?.kind === 'audio');
+        if (sender) await sender.replaceTrack(stream.getAudioTracks()[0]);
+    } catch(e) { console.error('Audio switch:', e); }
+}
+
+// ---- BLF ----
+function loadBLF() {
+    fetch('/api/blf?ext=' + myExt)
+        .then(r => r.json())
+        .then(renderBLF)
+        .catch(() => {
+            // Fallback - toon extensies uit pjsip
+            fetch('/api/extensions')
+                .then(r => r.json())
+                .then(renderBLF)
+                .catch(() => renderBLF([]));
+        });
+}
+
+function renderBLF(contacts) {
+    const list = document.getElementById('blfList');
+    const items = (contacts || []).filter(c => c.ext !== myExt && c.ext !== myExt + '-webrtc');
+    if (!items.length) {
+        list.innerHTML = '<div style="font-size:11px;color:#64748b;padding:4px">Geen collega\'s</div>';
+        return;
+    }
+    list.innerHTML = items.map(c => `
+        <div class="blf-item" onclick="setDialDisplay('${c.ext}')">
+            <div class="blf-dot ${c.status || 'offline'}"></div>
+            <div class="blf-name">${c.name || c.ext}</div>
+            <div class="blf-ext">${c.ext}</div>
+        </div>`).join('');
+}
+
+// ---- Keyboard ----
+document.addEventListener('keydown', e => {
+    if (document.getElementById('loginScreen').classList.contains('hidden')) {
+        if (['0','1','2','3','4','5','6','7','8','9','*','#'].includes(e.key)) key(e.key);
+        else if (e.key === 'Enter')     actionCall();
+        else if (e.key === 'Escape')    doHangup();
+        else if (e.key === 'Backspace') { e.preventDefault(); backspace(); }
+    }
+});
+
+// Init
+loadAudioDevices('cfgAudio');
+</script>
+</body>
+</html>

@@ -58,8 +58,10 @@ class AuthController extends BaseController
             redirect('?page=dashboard');
         }
 
-        // Mislukt — registreer poging
+        // Mislukt — registreer poging en log voor fail2ban
         $this->registerFailedAttempt($ip, $username);
+        $logMsg = date('Y-m-d H:i:s') . " asterisk-manager: Failed login from $ip user=$username\n";
+        @file_put_contents('/var/log/asterisk-manager-auth.log', $logMsg, FILE_APPEND);
         $attempts = $this->getRecentAttempts($ip);
 
         if ($attempts >= self::MAX_ATTEMPTS) {

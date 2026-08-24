@@ -10,6 +10,8 @@
         <button class="tab-item" onclick="showTab('users')">Users</button>
         <button class="tab-item" onclick="showTab('provisioning')">Provisioning</button>
         <button class="tab-item" onclick="showTab('system')">System</button>
+        <button class="tab-item" onclick="showTab('smtp')">✉ SMTP</button>
+        <button class="tab-item" onclick="showTab('links')">🔗 Meer</button>
     </div>
 
     <form method="POST" action="?page=settings&action=post_save">
@@ -304,6 +306,94 @@
             </div>
         </div>
     </div>
+
+    <!-- SMTP Tab -->
+    <div class="tab-pane" id="tab-smtp" style="display:none">
+        <div class="card mt-4" style="max-width:700px">
+            <div class="card-header"><h3 class="card-title">✉ SMTP / Email</h3></div>
+            <div class="card-body">
+                <form method="POST" action="?page=settings&action=post_smtp_save">
+                    <?= csrf() ?>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>SMTP Host</label>
+                            <input type="text" name="smtp_host" class="form-control mono"
+                                   value="<?= sanitize($smtp['smtp_host'] ?? '') ?>"
+                                   placeholder="172.25.5.12 of smtp.gmail.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Poort</label>
+                            <input type="number" name="smtp_port" class="form-control mono"
+                                   value="<?= sanitize($smtp['smtp_port'] ?? '25') ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Beveiliging</label>
+                            <select name="smtp_secure" class="form-control">
+                                <option value="none" <?= ($smtp['smtp_secure']??'none')==='none'?'selected':'' ?>>Geen (poort 25)</option>
+                                <option value="tls"  <?= ($smtp['smtp_secure']??'')==='tls'?'selected':'' ?>>STARTTLS (587)</option>
+                                <option value="ssl"  <?= ($smtp['smtp_secure']??'')==='ssl'?'selected':'' ?>>SSL (465)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Gebruikersnaam <small class="text-muted">(optioneel)</small></label>
+                            <input type="text" name="smtp_user" class="form-control mono"
+                                   value="<?= sanitize($smtp['smtp_user'] ?? '') ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Wachtwoord <small class="text-muted">(optioneel)</small></label>
+                            <input type="password" name="smtp_pass" class="form-control mono"
+                                   value="<?= sanitize($smtp['smtp_pass'] ?? '') ?>">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Van adres</label>
+                            <input type="email" name="smtp_from" class="form-control mono"
+                                   value="<?= sanitize($smtp['smtp_from'] ?? '') ?>"
+                                   placeholder="pbx@bedrijf.nl">
+                        </div>
+                        <div class="form-group">
+                            <label>Van naam</label>
+                            <input type="text" name="smtp_from_name" class="form-control"
+                                   value="<?= sanitize($smtp['smtp_from_name'] ?? '') ?>"
+                                   placeholder="PBX Voicemail">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-accent">💾 Opslaan</button>
+                </form>
+                <hr style="margin:20px 0;border-color:var(--border)">
+                <form method="POST" action="?page=settings&action=test_smtp">
+                    <?= csrf() ?>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Testmail naar</label>
+                            <input type="email" name="test_email" class="form-control mono" required>
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:flex-end">
+                            <button type="submit" class="btn btn-ghost">✉ Verzend</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meer Tab -->
+    <div class="tab-pane" id="tab-links" style="display:none">
+        <div class="card mt-4">
+            <div class="card-header"><h3 class="card-title">🔗 Overige</h3></div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:500px">
+                    <a href="?page=sounds"    class="btn btn-ghost">🔊 Sound Files →</a>
+                    <a href="?page=phonebook" class="btn btn-ghost">📒 Adresboek →</a>
+                    <a href="?page=security"  class="btn btn-ghost">🔒 Login Security →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>

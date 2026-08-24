@@ -8,10 +8,12 @@ require_once APP_ROOT . '/config.php';
 $logFile  = APP_ROOT . '/logs/cdr_import.log';
 $lockFile = '/tmp/cdr_import.lock';
 
+// Maak logs map aan als die niet bestaat
 if (!is_dir(APP_ROOT . '/logs')) {
     mkdir(APP_ROOT . '/logs', 0775, true);
 }
 
+// Voorkom dubbele uitvoering
 if (file_exists($lockFile) && (time() - filemtime($lockFile)) < 55) {
     exit(0);
 }
@@ -37,9 +39,17 @@ try {
 
     $count = 0;
     foreach ($rows as $row) {
-        $disposition = strtoupper(trim($row['disposition'] ?? ''));
+        $dispRaw = trim($row['disposition'] ?? '');
+        $dispMap = ['0'=>'NO ANSWER','1'=>'NO ANSWER','2'=>'BUSY','4'=>'FAILED','8'=>'ANSWERED'];
+        if (isset($dispMap[$dispRaw])) {
+            $disposition = $dispMap[$dispRaw];
+        } else {
+            $disposition = strtoupper($dispRaw);
+        }
         if (empty($disposition)) {
-            $disposition = ($row['billsec'] > 0) ? 'ANSWERED' : 'NO ANSWER';
+            if ($row['billsec'] > 0) $disposition = 'ANSWERED';
+            elseif ($row['duration'] > 0) $disposition = 'NO ANSWER';
+            else $disposition = 'FAILED';
         }
         try {
             $result = Database::query(

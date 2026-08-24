@@ -157,6 +157,23 @@ class ProvisionController extends BaseController
             die('Phone not found: ' . $macFormatted);
         }
 
+        // Controleer of het request van een Yealink toestel komt
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $allowedAgents = ['Yealink', 'Gigaset', 'Snom', 'Grandstream', 'Polycom', 'Cisco'];
+        $isPhone = false;
+        foreach ($allowedAgents as $agent) {
+            if (stripos($userAgent, $agent) !== false) {
+                $isPhone = true;
+                break;
+            }
+        }
+
+        if (!$isPhone) {
+            http_response_code(403);
+            header('Content-Type: text/plain');
+            die('Access denied.');
+        }
+
         // Update last provision timestamp
         Database::update('provision_phones', ['last_provision' => date('Y-m-d H:i:s')], 'id=?', [$phone['id']]);
 

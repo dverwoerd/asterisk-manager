@@ -4,9 +4,34 @@
     <a href="?page=extensions" class="btn btn-ghost">← <?= t('back') ?></a>
 </div>
 
+<!-- Tab navigatie -->
+<div class="tab-nav" style="display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
+    <button type="button" class="tab-btn active" onclick="showTab('basic')"
+            style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-muted);font-size:13px;font-family:inherit">
+        ☎ Basis
+    </button>
+    <button type="button" class="tab-btn" onclick="showTab('cf')"
+            style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-muted);font-size:13px;font-family:inherit">
+        ↗ Doorschakelen
+    </button>
+    <button type="button" class="tab-btn" onclick="showTab('security')"
+            style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-muted);font-size:13px;font-family:inherit">
+        🔒 Security
+    </button>
+    <?php if ($isEdit): ?>
+    <button type="button" class="tab-btn" onclick="showTab('provision')"
+            style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-muted);font-size:13px;font-family:inherit">
+        📱 Toestel Provisioning
+    </button>
+    <?php endif; ?>
+</div>
+
 <form method="POST" action="?page=extensions&action=post_<?= $action ?><?= $isEdit ? '&id='.$ext['id'] : '' ?>">
     <?= csrf() ?>
-    <div class="form-layout">
+
+    <!-- Tab: Basis -->
+    <div id="tab-basic" class="tab-content">
+<div class="form-layout">
         <!-- Left column -->
         <div class="form-col">
             <div class="card">
@@ -227,12 +252,31 @@
                     </div>
                     <div id="vmFields"
                          <?= !$ext['voicemail_enabled'] ? 'style="display:none"' : '' ?>>
-                        <div class="form-group mt-3">
-                            <label><?= t('voicemail_pin') ?></label>
-                            <input type="text" name="voicemail_pin"
-                                   class="form-control mono"
-                                   value="<?= sanitize($ext['voicemail_pin']) ?>"
-                                   pattern="\d{4,8}" placeholder="4–8 digits">
+                        <div class="form-row mt-3">
+                            <div class="form-group">
+                                <label><?= t('voicemail_pin') ?></label>
+                                <input type="text" name="voicemail_pin"
+                                       class="form-control mono"
+                                       value="<?= sanitize($ext['voicemail_pin'] ?? '') ?>"
+                                       pattern="\d{4,8}" placeholder="4–8 cijfers">
+                            </div>
+                            <div class="form-group">
+                                <label>Email (doorsturen berichten)</label>
+                                <input type="email" name="email" class="form-control"
+                                       value="<?= sanitize($ext['email'] ?? '') ?>"
+                                       placeholder="gebruiker@bedrijf.nl">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Begroeting (greeting soundfile)</label>
+                            <div style="display:flex;gap:8px">
+                                <input type="text" name="voicemail_greeting" id="voicemail_greeting"
+                                       class="form-control mono"
+                                       value="<?= sanitize($ext['voicemail_greeting'] ?? '') ?>"
+                                       placeholder="custom/welkom of leeg voor standaard">
+                                <button type="button" class="btn btn-ghost" onclick="openSoundPicker('voicemail_greeting')">🔊 Kies</button>
+                            </div>
+                            <small class="form-hint">Eigen begroetingsbericht. Laat leeg voor de standaard Asterisk begroeting.</small>
                         </div>
                     </div>
                 </div>
@@ -249,7 +293,15 @@
         </div>
     </div>
 
-    <div class="card mb-4">
+    <div class="form-actions">
+        <a href="?page=extensions" class="btn btn-ghost"><?= t('cancel') ?></a>
+        <button type="submit" class="btn btn-accent">💾 <?= t('save') ?></button>
+    </div>
+    </div>
+
+    <!-- Tab: Doorschakelen -->
+    <div id="tab-cf" class="tab-content" style="display:none">
+<div class="card mb-4">
         <div class="card-header"><h3 class="card-title">📞 Doorschakelen (Call Forward)</h3></div>
         <div class="card-body">
             <div class="form-row">
@@ -290,23 +342,176 @@
         </div>
     </div>
 
-    <div class="card mb-4">
-        <div class="card-header"><h3 class="card-title">🔒 Security</h3></div>
-        <div class="card-body">
-            <div class="form-group">
-                <label>Extra toegestane IPs <small class="text-muted">(voor externe toestellen)</small></label>
-                <input type="text" name="allowed_ips" class="form-control mono"
-                       value="<?= sanitize($ext['allowed_ips'] ?? '') ?>"
-                       placeholder="1.2.3.4, 5.6.7.8/24">
-                <small class="form-hint">Intern netwerk (172.16.0.0/12, 10.0.0.0/8, 192.168.0.0/16) is altijd toegestaan. Voeg externe IPs komma-gescheiden toe.</small>
-            </div>
-        </div>
-    </div>
     <div class="form-actions">
         <a href="?page=extensions" class="btn btn-ghost"><?= t('cancel') ?></a>
         <button type="submit" class="btn btn-accent">💾 <?= t('save') ?></button>
     </div>
+    </div>
+
+    <!-- Tab: Security -->
+    <div id="tab-security" class="tab-content" style="display:none">
+<div class="card mb-4">
+        <div class="card-header"><h3 class="card-title">🔒 Security — IP Toegang</h3></div>
+        <div class="card-body">
+            <!-- Altijd toegestane netwerken -->
+            <div class="card mb-3" style="border-color:var(--success)">
+                <div class="card-body" style="padding:10px 14px">
+                    <small style="color:var(--success);font-weight:bold">✓ Altijd toegestaan (intern netwerk)</small><br>
+                    <span class="mono text-sm">172.16.0.0/12 &nbsp;·&nbsp; 10.0.0.0/8 &nbsp;·&nbsp; 192.168.0.0/16</span>
+                </div>
+            </div>
+
+            <!-- Extra externe IPs -->
+            <div class="form-group">
+                <label>Extra toegestane IPs <small class="text-muted">(externe toestellen)</small></label>
+                <div id="ip-entries">
+                    <?php
+                    $allowedIps = array_filter(array_map('trim', explode(',', $ext['allowed_ips'] ?? '')));
+                    if (empty($allowedIps)) $allowedIps = [''];
+                    foreach ($allowedIps as $i => $ip):
+                    ?>
+                    <div class="ip-entry" style="display:flex;gap:8px;margin-bottom:6px" id="ip-row-<?= $i ?>">
+                        <input type="text" name="allowed_ips_list[]"
+                               class="form-control mono"
+                               value="<?= sanitize($ip) ?>"
+                               placeholder="bijv. 1.2.3.4 of 5.6.7.0/24"
+                               style="max-width:300px">
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="removeIpRow(this)" title="Verwijder">✕</button>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="addIpRow()" style="margin-top:4px">+ IP toevoegen</button>
+                <small class="form-hint">Voeg hier externe IP adressen of subnetten toe. Leeg laten als het toestel alleen intern bereikbaar is.</small>
+            </div>
+
+            <!-- Overzicht huidige ACL -->
+            <?php if (!empty($ext['allowed_ips'])): ?>
+            <div class="card mt-3" style="border-color:var(--info)">
+                <div class="card-body" style="padding:10px 14px">
+                    <small style="color:var(--info);font-weight:bold">Huidige ACL configuratie in pjsip.conf:</small><br>
+                    <code class="mono text-sm" style="font-size:11px">
+                        deny=0.0.0.0/0.0.0.0<br>
+                        permit=172.16.0.0/12<br>
+                        permit=10.0.0.0/8<br>
+                        permit=192.168.0.0/16<br>
+                        <?php foreach (array_filter(array_map('trim', explode(',', $ext['allowed_ips']))) as $ip): ?>
+                        permit=<?= sanitize($ip) ?><br>
+                        <?php endforeach; ?>
+                    </code>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <script>
+    let ipRowCount = <?= count($allowedIps) ?>;
+
+    function addIpRow() {
+        const container = document.getElementById('ip-entries');
+        const div = document.createElement('div');
+        div.className = 'ip-entry';
+        div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px';
+        div.id = 'ip-row-' + ipRowCount;
+        div.innerHTML = '<input type="text" name="allowed_ips_list[]" class="form-control mono" placeholder="bijv. 1.2.3.4" style="max-width:300px">' +
+                        '<button type="button" class="btn btn-ghost btn-sm" onclick="removeIpRow(this)" title="Verwijder">✕</button>';
+        container.appendChild(div);
+        ipRowCount++;
+        div.querySelector('input').focus();
+    }
+
+    function removeIpRow(btn) {
+        const row = btn.closest('.ip-entry');
+        const container = document.getElementById('ip-entries');
+        if (container.querySelectorAll('.ip-entry').length > 1) {
+            row.remove();
+        } else {
+            row.querySelector('input').value = '';
+        }
+    }
+    </script>
+
+    <div class="form-actions">
+        <a href="?page=extensions" class="btn btn-ghost"><?= t('cancel') ?></a>
+        <button type="submit" class="btn btn-accent">💾 <?= t('save') ?></button>
+    </div>
+    </div>
+
+
+<!-- Tab: Provisioning (buiten form) -->
+<?php if ($isEdit): ?>
 </form>
+
+<div id="tab-provision" class="tab-content" style="display:none">
+<!-- Sound Picker Modal -->
+<div id="soundPickerModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:600px;max-height:80vh;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 style="margin:0">🔊 Kies een Soundfile</h3>
+            <button type="button" onclick="closeSoundPicker()" class="btn btn-ghost btn-sm">✕</button>
+        </div>
+        <input type="text" id="soundSearch" class="form-control mono" placeholder="Zoek..." oninput="filterSounds()" style="margin-bottom:12px">
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button type="button" class="btn btn-sm btn-ghost" onclick="loadSounds('en')">EN</button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="loadSounds('nl')">NL</button>
+            <button type="button" class="btn btn-sm btn-accent" onclick="loadSounds('custom')">Custom</button>
+        </div>
+        <div id="soundList" style="overflow-y:auto;flex:1;display:grid;grid-template-columns:1fr 1fr;gap:4px"></div>
+    </div>
+</div>
+
+<script>
+let currentField = null;
+let currentPrefix = '';
+
+function openSoundPicker(fieldId) {
+    currentField = fieldId;
+    document.getElementById('soundPickerModal').style.display = 'flex';
+    loadSounds('custom');
+}
+
+function closeSoundPicker() {
+    document.getElementById('soundPickerModal').style.display = 'none';
+}
+
+function loadSounds(lang) {
+    currentPrefix = lang === 'custom' ? 'custom/' : '';
+    fetch('?page=sounds&action=list&lang=' + lang)
+        .then(r => r.json())
+        .then(data => {
+            const sounds = lang === 'custom' ? data.custom : data.sounds;
+            renderSounds(sounds, currentPrefix);
+        });
+}
+
+function renderSounds(sounds, prefix) {
+    const list = document.getElementById('soundList');
+    if (!sounds.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:12px">Geen bestanden gevonden.</div>';
+        return;
+    }
+    list.innerHTML = sounds.map(s =>
+        `<div class="mono" style="padding:6px 10px;border-radius:4px;cursor:pointer;background:var(--bg-secondary);font-size:12px"
+              onclick="selectSound('${prefix}${s}')">${prefix}${s}</div>`
+    ).join('');
+}
+
+function selectSound(name) {
+    document.getElementById(currentField).value = name;
+    closeSoundPicker();
+}
+
+function filterSounds() {
+    const q = document.getElementById('soundSearch').value.toLowerCase();
+    document.querySelectorAll('#soundList .mono').forEach(el => {
+        el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+document.getElementById('soundPickerModal').addEventListener('click', function(e) {
+    if (e.target === this) closeSoundPicker();
+});
+</script>
 
 <?php if ($isEdit): ?>
 <!-- Provisioning sectie onder het extensie formulier -->
@@ -642,5 +847,43 @@ function updateStrength(val) {
 // Listen to manual input
 document.getElementById('secret').addEventListener('input', function() {
     updateStrength(this.value);
+});
+</script>
+</div>
+<?php endif; ?>
+
+<script>
+function showTab(name) {
+    // Verberg alle tabs
+    document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(b => {
+        b.style.borderBottomColor = 'transparent';
+        b.style.color = 'var(--text-muted)';
+    });
+
+    // Toon geselecteerde tab
+    const tab = document.getElementById('tab-' + name);
+    if (tab) tab.style.display = 'block';
+
+    // Activeer knop
+    const btns = document.querySelectorAll('.tab-btn');
+    const idx = ['basic','cf','security','provision'].indexOf(name);
+    if (btns[idx]) {
+        btns[idx].style.borderBottomColor = 'var(--accent)';
+        btns[idx].style.color = 'var(--accent)';
+    }
+
+    // Sla actieve tab op in URL hash
+    history.replaceState(null, '', '#tab-' + name);
+}
+
+// Herstel tab uit URL hash
+document.addEventListener('DOMContentLoaded', function() {
+    const hash = location.hash.replace('#tab-', '');
+    if (['basic','cf','security','provision'].includes(hash)) {
+        showTab(hash);
+    } else {
+        showTab('basic');
+    }
 });
 </script>

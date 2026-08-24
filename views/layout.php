@@ -14,7 +14,6 @@
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <div class="sidebar-logo">
-            <div class="logo-icon">⬡</div>
             <div class="logo-text">
                 <span class="logo-name">ASTERISK</span>
                 <span class="logo-sub">MANAGER</span>
@@ -78,14 +77,8 @@
         <a href="?page=provision" class="nav-item<?= activeNav('provision') ?>">
             <span class="nav-icon">📱</span><span class="nav-label">Yealink Phones</span>
         </a>
-        <a href="?page=phonebook" class="nav-item<?= activeNav('phonebook') ?>">
-            <span class="nav-icon">📒</span><span class="nav-label">Adresboek</span>
-        </a>
 
         <div class="nav-section-label">SYSTEM</div>
-        <a href="?page=security" class="nav-item<?= activeNav('security') ?>">
-            <span class="nav-icon">🔒</span><span class="nav-label">Login Security</span>
-        </a>
         <a href="?page=settings" class="nav-item<?= activeNav('settings') ?>">
             <span class="nav-icon">⚙</span><span class="nav-label"><?= t('settings') ?></span>
         </a>
@@ -108,7 +101,7 @@
                 <?php endforeach; ?>
             </select>
         </form>
-        <a href="?page=login&action=logout" class="logout-btn"><?= t('logout') ?> ⏻</a>
+        <a href="?page=logout" class="logout-btn"><?= t('logout') ?> ⏻</a>
     </div>
 </aside>
 

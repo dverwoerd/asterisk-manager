@@ -11,7 +11,33 @@ class SettingsController extends BaseController
         foreach ($rows as $r) $settings[$r['setting_key']] = $r['setting_value'];
         $languages = I18n::availableLanguages();
         $users     = Database::fetchAll("SELECT * FROM users ORDER BY username");
-        $this->view('settings.index', ['title' => t('settings'), 'settings' => $settings, 'languages' => $languages, 'users' => $users]);
+        // SMTP data voor settings tab
+        $smtp = [
+            'smtp_host'      => Database::getSetting('smtp_host', ''),
+            'smtp_port'      => Database::getSetting('smtp_port', '25'),
+            'smtp_user'      => Database::getSetting('smtp_user', ''),
+            'smtp_pass'      => Database::getSetting('smtp_pass', ''),
+            'smtp_from'      => Database::getSetting('smtp_from', ''),
+            'smtp_from_name' => Database::getSetting('smtp_from_name', ''),
+            'smtp_secure'    => Database::getSetting('smtp_secure', 'none'),
+        ];
+
+        $smtp = [
+            'smtp_host'      => Database::getSetting('smtp_host', ''),
+            'smtp_port'      => Database::getSetting('smtp_port', '25'),
+            'smtp_user'      => Database::getSetting('smtp_user', ''),
+            'smtp_pass'      => Database::getSetting('smtp_pass', ''),
+            'smtp_from'      => Database::getSetting('smtp_from', ''),
+            'smtp_from_name' => Database::getSetting('smtp_from_name', ''),
+            'smtp_secure'    => Database::getSetting('smtp_secure', 'none'),
+        ];
+        $this->view('settings.index', [
+            'title'     => t('settings'),
+            'settings'  => $settings,
+            'languages' => $languages,
+            'users'     => $users,
+            'smtp'      => $smtp,
+        ]);
     }
 
     public function post_save(): void
@@ -37,6 +63,103 @@ class SettingsController extends BaseController
         }
         $this->flash('success', t('settings_saved'));
         redirect('?page=settings');
+    }
+
+    public function smtp(): void
+    {
+        $smtp = [
+            'smtp_host'     => Database::getSetting('smtp_host', ''),
+            'smtp_port'     => Database::getSetting('smtp_port', '587'),
+            'smtp_user'     => Database::getSetting('smtp_user', ''),
+            'smtp_pass'     => Database::getSetting('smtp_pass', ''),
+            'smtp_from'     => Database::getSetting('smtp_from', ''),
+            'smtp_from_name'=> Database::getSetting('smtp_from_name', ''),
+            'smtp_secure'   => Database::getSetting('smtp_secure', 'tls'),
+        ];
+
+        $this->view('settings.smtp', [
+            'title' => 'SMTP / Email Instellingen',
+            'smtp'  => $smtp,
+        ]);
+    }
+
+    public function post_smtp_save(): void
+    {
+        $this->requireOperator();
+        $fields = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass',
+                   'smtp_from', 'smtp_from_name', 'smtp_secure'];
+
+        foreach ($fields as $key) {
+            $val = trim($this->post($key, ''));
+            Database::query(
+                "INSERT INTO settings (setting_key, setting_value) VALUES (?,?)
+                 ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)",
+                [$key, $val]
+            );
+        }
+
+        // Update /etc/asterisk/res_smtp_client.conf
+        $this->generateSmtpConfig();
+
+        $this->flash('success', 'SMTP instellingen opgeslagen.');
+        redirect('?page=settings&action=smtp');
+    }
+
+    public function test_smtp(): void
+    {
+        $this->requireOperator();
+        $to   = trim($this->post('test_email', ''));
+        $from = Database::getSetting('smtp_from', '');
+
+        if (empty($to) || empty($from)) {
+            $this->flash('danger', 'Vul eerst SMTP instellingen in en sla op.');
+            redirect('?page=settings&action=smtp');
+        }
+
+        // Stuur test mail via sendmail/msmtp
+        $subject = 'Test mail van Asterisk Manager';
+        $body    = 'Dit is een testbericht van de Asterisk Manager PBX.';
+        $headers = "From: {$from}
+Content-Type: text/plain; charset=UTF-8";
+
+        if (mail($to, $subject, $body, $headers)) {
+            $this->flash('success', "Testmail verzonden naar {$to}.");
+        } else {
+            $this->flash('danger', 'Verzenden mislukt — controleer SMTP instellingen en server configuratie.');
+        }
+
+        redirect('?page=settings&action=smtp');
+    }
+
+    private function generateSmtpConfig(): void
+    {
+        $host   = Database::getSetting('smtp_host', '');
+        $port   = Database::getSetting('smtp_port', '25');
+        $user   = Database::getSetting('smtp_user', '');
+        $pass   = Database::getSetting('smtp_pass', '');
+        $from   = Database::getSetting('smtp_from', '');
+        $secure = Database::getSetting('smtp_secure', 'none');
+
+        if (empty($host)) return;
+
+        $useAuth = !empty($user) && !empty($pass);
+
+        $conf  = "defaults\n";
+        $conf .= "auth           " . ($useAuth ? 'on' : 'off') . "\n";
+        $conf .= "tls            " . ($useAuth && $secure !== 'none' ? 'on' : 'off') . "\n";
+        $conf .= "tls_starttls   " . ($useAuth && $secure === 'tls' ? 'on' : 'off') . "\n";
+        $conf .= "logfile        /var/log/msmtp.log\n\n";
+        $conf .= "account        default\n";
+        $conf .= "host           {$host}\n";
+        $conf .= "port           {$port}\n";
+        $conf .= "from           {$from}\n";
+        if ($useAuth) {
+            $conf .= "user           {$user}\n";
+            $conf .= "password       {$pass}\n";
+        }
+
+        file_put_contents('/etc/msmtprc', $conf);
+        chmod('/etc/msmtprc', 0600);
     }
 
     public function test_ami(): void

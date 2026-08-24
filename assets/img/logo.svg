@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 80" width="430" height="80">
+  <defs>
+    
+  </defs>
+  <rect x="2" y="10" width="52" height="16" rx="5" fill="#1B3A6B"></rect>
+  <rect x="2" y="31" width="52" height="16" rx="5" fill="#F37021"></rect>
+  <rect x="2" y="52" width="52" height="16" rx="5" fill="#1B3A6B"></rect>
+  <text x="80" y="45" font-family="Archivo, sans-serif" font-weight="800" font-size="36" letter-spacing="0.5" fill="#1B3A6B">PANTRONIC<tspan fill="#F37021"> IT</tspan></text>
+  <text x="82" y="65" font-family="Manrope, sans-serif" font-weight="600" font-size="10" letter-spacing="2.4" fill="#9A958C">NETWERKEN · INFRASTRUCTUUR · CLOUD</text>
+</svg>
