@@ -1,3 +1,5 @@
+Reminder: Initial Release - BUGs are included : Please give me feedback, all comments are welcome !
+
 # Asterisk Manager
 
 A complete web-based management system for **Asterisk 22** on Debian with Apache2.

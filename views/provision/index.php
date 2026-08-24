@@ -94,6 +94,10 @@ $provPath   = getSetting('provision_tftp_path', APP_ROOT . '/provision');
                        class="btn btn-sm btn-ghost" title="Hergeneer config">⟳</a>
                     <a href="?page=provision&action=reboot&id=<?= $p['id'] ?>" class="btn btn-sm btn-ghost" title="Toestel herstarten" onclick="return confirm('Toestel herstarten?')">↺ Reboot</a>
                     <a href="?page=provision&action=reprovision&id=<?= $p['id'] ?>" class="btn btn-sm btn-ghost" title="Herlaad configuratie zonder reboot" onclick="return confirm('Configuratie opnieuw laden?')">⟳ Reprovision</a>
+                    <?php if (!empty($p['extension_id'])): ?>
+                    <a href="?page=provision&action=microsip&ext_id=<?= $p['extension_id'] ?>"
+                       class="btn btn-sm btn-ghost" title="Download MicroSIP configuratie" download>💻 MicroSIP</a>
+                    <?php endif; ?>
                     <a href="?page=provision&action=edit&id=<?= $p['id'] ?>"
                        class="btn btn-sm btn-ghost"><?= t('edit') ?></a>
                     <a href="?page=provision&action=delete&id=<?= $p['id'] ?>"
