@@ -403,97 +403,45 @@ class ProvisionController extends BaseController
 
     public function microsip(): void
     {
-        // MicroSIP XML configuratie download voor een extensie
         $extId = (int)$this->get('ext_id', 0);
-        if (!$extId) {
-            http_response_code(400);
-            die('Geen extensie opgegeven');
-        }
+        if (!$extId) { http_response_code(400); die('Geen extensie opgegeven'); }
 
         $ext = Database::fetchOne("SELECT * FROM extensions WHERE id=?", [$extId]);
-        if (!$ext) {
-            http_response_code(404);
-            die('Extensie niet gevonden');
-        }
+        if (!$ext) { http_response_code(404); die('Extensie niet gevonden'); }
 
-        $server   = Database::getSetting('asterisk_external_host', 'pbx.clearvoip.nl');
-        $ext_num  = $ext['extension'];
-        $name     = $ext['full_name'] ?? $ext_num;
-        $secret   = $ext['secret'] ?? '';
+        $server  = Database::getSetting('asterisk_external_host', 'pbx.clearvoip.nl');
+        $ext_num = $ext['extension'];
+        $name    = $ext['full_name'] ?? $ext_num;
+        $secret  = $ext['secret'] ?? '';
 
-        // Genereer MicroSIP XML configuratie
-        $xml  = '<?xml version="1.0" encoding="utf-8"?>' . "
-";
-        $xml .= '<MicroSIP>' . "
-";
-        $xml .= '  <accounts>' . "
-";
-        $xml .= '    <account>' . "
-";
-        $xml .= '      <name>' . htmlspecialchars($name) . '</name>' . "
-";
-        $xml .= '      <server>' . htmlspecialchars($server) . '</server>' . "
-";
-        $xml .= '      <domain>' . htmlspecialchars($server) . '</domain>' . "
-";
-        $xml .= '      <username>' . htmlspecialchars($ext_num) . '</username>' . "
-";
-        $xml .= '      <password>' . htmlspecialchars($secret) . '</password>' . "
-";
-        $xml .= '      <authID>' . htmlspecialchars($ext_num) . '</authID>' . "
-";
-        $xml .= '      <displayName>' . htmlspecialchars($name) . '</displayName>' . "
-";
-        $xml .= '      <dialPlan></dialPlan>' . "
-";
-        $xml .= '      <disableEncryption>1</disableEncryption>' . "
-";
-        $xml .= '      <srtp>0</srtp>' . "
-";
-        $xml .= '      <dtmfMode>2</dtmfMode>' . "
-";
-        $xml .= '      <zrtp>0</zrtp>' . "
-";
-        $xml .= '      <publishEnabled>0</publishEnabled>' . "
-";
-        $xml .= '    </account>' . "
-";
-        $xml .= '  </accounts>' . "
-";
-        $xml .= '  <settings>' . "
-";
-        $xml .= '    <outputDevice></outputDevice>' . "
-";
-        $xml .= '    <inputDevice></inputDevice>' . "
-";
-        $xml .= '    <ringDevice></ringDevice>' . "
-";
-        $xml .= '    <codecs>PCMA/8000/1,PCMU/8000/1,G722/8000/1</codecs>' . "
-";
-        $xml .= '    <audioCodecs>PCMA/8000/1,PCMU/8000/1,G722/8000/1</audioCodecs>' . "
-";
-        $xml .= '    <logLevel>0</logLevel>' . "
-";
-        $xml .= '    <autoAnswer>0</autoAnswer>' . "
-";
-        $xml .= '    <autoAnswerDelay>0</autoAnswerDelay>' . "
-";
-        $xml .= '    <enableSTUN>0</enableSTUN>' . "
-";
-        $xml .= '    <stun></stun>' . "
-";
-        $xml .= '    <tcpEnabled>0</tcpEnabled>' . "
-";
-        $xml .= '  </settings>' . "
-";
-        $xml .= '</MicroSIP>' . "
-";
+        // Genereer MicroSIP INI configuratie
+        $ini  = "[accounts]\n";
+        $ini .= "1_name=" . $name . "\n";
+        $ini .= "1_server=" . $server . "\n";
+        $ini .= "1_domain=" . $server . "\n";
+        $ini .= "1_username=" . $ext_num . "\n";
+        $ini .= "1_password=" . $secret . "\n";
+        $ini .= "1_authID=" . $ext_num . "\n";
+        $ini .= "1_displayName=" . $name . "\n";
+        $ini .= "1_dialPlan=\n";
+        $ini .= "1_disableEncryption=1\n";
+        $ini .= "1_srtp=0\n";
+        $ini .= "1_dtmfMode=2\n";
+        $ini .= "1_zrtp=0\n";
+        $ini .= "1_publishEnabled=0\n";
+        $ini .= "\n";
+        $ini .= "[settings]\n";
+        $ini .= "codecs=PCMA/8000/1,PCMU/8000/1,G722/8000/1\n";
+        $ini .= "audioCodecs=PCMA/8000/1,PCMU/8000/1,G722/8000/1\n";
+        $ini .= "logLevel=0\n";
+        $ini .= "autoAnswer=0\n";
+        $ini .= "enableSTUN=0\n";
 
-        $filename = 'microsip-' . $ext_num . '.xml';
-        header('Content-Type: application/xml; charset=utf-8');
+        $filename = 'microsip-' . $ext_num . '.ini';
+        header('Content-Type: text/plain; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Content-Length: ' . strlen($xml));
-        echo $xml;
+        header('Content-Length: ' . strlen($ini));
+        echo $ini;
         exit;
     }
 
