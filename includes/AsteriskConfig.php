@@ -515,7 +515,9 @@ class AsteriskConfig
             $ringTime = (int)($ext['ring_time'] ?? 20);
 
             $out .= 'exten => ' . $exten . ",1,NoOp(Call to extension " . $exten . ")\n";
+            $out .= ' same => n,GotoIf($["${FROM_DID}" = "1"]?skipcid' . $exten . ')' . "\n";
             $out .= ' same => n,Set(CALLERID(name)=' . $cidName . ")\n";
+            $out .= ' same => n(skipcid' . $exten . '),NoOp()' . "\n";
 
             // Altijd doorschakelen
             if (!empty($cfAlways)) {
@@ -650,6 +652,7 @@ class AsteriskConfig
             // Toon het gebelde nummer (DID) samen met de beller op het toestel:
             // bv. "0612345678 -> Verkoop" i.p.v. alleen de naam van de beller
             $out .= ' same => n,Set(CALLERID(name)=${CALLERID(num)} -> ' . $didLabel . ")\n";
+            $out .= ' same => n,Set(__FROM_DID=1)' . "\n";
             $out .= " same => n,Answer()\n";
             $out .= $this->destinationLine($route['destination_type'], $route['destination']);
             $out .= " same => n,Hangup()\n\n";
