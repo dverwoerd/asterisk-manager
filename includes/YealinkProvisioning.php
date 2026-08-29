@@ -179,7 +179,12 @@ class YealinkProvisioning
         $cfg .= "account.1.blf.subscribe_period = 900\n";
         $cfg .= "account.1.dns_cache_type = 1\n";
         $cfg .= "account.1.register_mac = 1\n";
-        $cfg .= "account.1.cid_source_ppi = 1\n";
+        // Caller ID bron prioriteit: 0=Auto, gebruik From-header display name
+        // (PPI/PAI headers worden door onze trunks niet altijd meegestuurd)
+        $cfg .= "account.1.cid_source = 0\n";
+        $cfg .= "account.1.cid_source_ppi = 0\n";
+        $cfg .= "account.1.cid_source_pai = 0\n";
+        $cfg .= "account.1.cid_source_from = 1\n";
         $cfg .= "account.1.session_timer.enable = 0\n";
         $cfg .= "account.1.check_cseq.enable = 1\n";
         $cfg .= "account.1.check_to_tag.enable = 1\n";
