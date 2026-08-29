@@ -643,8 +643,13 @@ class AsteriskConfig
         $out   .= "include => from-trunk-custom\n\n";
 
         foreach ($routes as $route) {
-            $did  = !empty($route['did']) ? $route['did'] : 's';
+            $did      = !empty($route['did']) ? $route['did'] : 's';
+            $didLabel = !empty($route['description']) ? $route['description'] : $did;
+
             $out .= 'exten => ' . $did . ",1,NoOp(Inbound DID: " . $did . ")\n";
+            // Toon het gebelde nummer (DID) samen met de beller op het toestel:
+            // bv. "0612345678 -> Verkoop" i.p.v. alleen de naam van de beller
+            $out .= ' same => n,Set(CALLERID(name)=${CALLERID(num)} -> ' . $didLabel . ")\n";
             $out .= " same => n,Answer()\n";
             $out .= $this->destinationLine($route['destination_type'], $route['destination']);
             $out .= " same => n,Hangup()\n\n";
