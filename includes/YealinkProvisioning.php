@@ -185,6 +185,12 @@ class YealinkProvisioning
         $cfg .= "account.1.cid_source_ppi = 0\n";
         $cfg .= "account.1.cid_source_pai = 0\n";
         $cfg .= "account.1.cid_source_from = 1\n";
+        // Voorkom dat het toestel de CallerID vervangt door een naam uit het telefoonboek
+        // (anders wint de telefoonboek-match altijd van onze dynamische DID-naam)
+        $cfg .= "phonebook.match_incoming_call = 0\n";
+        $cfg .= "phone_setting.lookup_source_dnd = 0\n";
+        $cfg .= "features.remote_phonebook.replace_callerid = 0\n";
+        $cfg .= "local_contact.match_display_name = 0\n";
         $cfg .= "account.1.session_timer.enable = 0\n";
         $cfg .= "account.1.check_cseq.enable = 1\n";
         $cfg .= "account.1.check_to_tag.enable = 1\n";
