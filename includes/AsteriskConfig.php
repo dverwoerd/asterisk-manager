@@ -651,7 +651,8 @@ class AsteriskConfig
             $out .= 'exten => ' . $did . ",1,NoOp(Inbound DID: " . $did . ")\n";
             // Toon het gebelde nummer (DID) samen met de beller op het toestel:
             // bv. "0612345678 -> Verkoop" i.p.v. alleen de naam van de beller
-            $out .= ' same => n,Set(CALLERID(name)=${CALLERID(num)} -> ' . $didLabel . ")\n";
+            $didLabelShort = mb_substr($didLabel, 0, 20); // hou ruimte vrij voor nummer + " > " op het schermpje
+            $out .= ' same => n,Set(CALLERID(name)=${CALLERID(num)} > ' . $didLabelShort . ")\n";
             $out .= ' same => n,Set(__FROM_DID=1)' . "\n";
             $out .= " same => n,Answer()\n";
             $out .= $this->destinationLine($route['destination_type'], $route['destination']);
