@@ -653,6 +653,10 @@ class AsteriskConfig
             // bv. "0612345678 -> Verkoop" i.p.v. alleen de naam van de beller
             $didLabelShort = mb_substr($didLabel, 0, 20); // hou ruimte vrij voor nummer + " > " op het schermpje
             $out .= ' same => n,Set(CALLERID(name)=${CALLERID(num)} > ' . $didLabelShort . ")\n";
+            // Stuur ook expliciet een P-Asserted-Identity header met de DID-naam.
+            // Yealink toestellen tonen PAI vaak los van/vóór de telefoonboek-matching op From.
+            $out .= ' same => n,Set(PJSIP_HEADER(add,X-Did-Label)=' . $didLabelShort . ")\n";
+            $out .= ' same => n,Set(CONNECTEDLINE(name)=${CALLERID(num)} > ' . $didLabelShort . ")\n";
             $out .= ' same => n,Set(__FROM_DID=1)' . "\n";
             $out .= " same => n,Answer()\n";
             $out .= $this->destinationLine($route['destination_type'], $route['destination']);
