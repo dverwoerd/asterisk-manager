@@ -515,6 +515,75 @@ class ProvisionController extends BaseController
         exit;
     }
 
+    public function lines(): void
+    {
+        $phoneId = (int)$this->get('id', 0);
+        $phone   = Database::fetchOne("SELECT * FROM provision_phones WHERE id=?", [$phoneId]);
+        if (!$phone) redirect('?page=provision');
+
+        $lines = Database::fetchAll(
+            "SELECT * FROM provision_phone_lines WHERE phone_id=? ORDER BY line_number",
+            [$phoneId]
+        );
+
+        $this->view('provision.lines', [
+            'title' => 'Extra lijnen',
+            'phone' => $phone,
+            'lines' => $lines,
+        ]);
+    }
+
+    public function post_add_line(): void
+    {
+        $this->requireOperator();
+        $phoneId = (int)$this->post('phone_id', 0);
+        $phone   = Database::fetchOne("SELECT * FROM provision_phones WHERE id=?", [$phoneId]);
+        if (!$phone) redirect('?page=provision');
+
+        $label = trim($this->post('label', ''));
+        if (empty($label)) {
+            $this->flash('danger', 'Vul een label in.');
+            redirect('?page=provision&action=lines&id=' . $phoneId);
+        }
+
+        // Volgend vrij lijnnummer bepalen (2, 3, 4, ...)
+        $maxLine = Database::fetchOne(
+            "SELECT MAX(line_number) as m FROM provision_phone_lines WHERE phone_id=?",
+            [$phoneId]
+        );
+        $lineNumber = max(2, (int)($maxLine['m'] ?? 1) + 1);
+
+        // Unieke username en willekeurig wachtwoord genereren
+        $baseExt  = Database::fetchOne("SELECT extension FROM extensions WHERE id=?", [$phone['extension_id']]);
+        $username = ($baseExt['extension'] ?? 'line') . '-l' . $lineNumber;
+        $secret   = bin2hex(random_bytes(8));
+
+        Database::insert('provision_phone_lines', [
+            'phone_id'    => $phoneId,
+            'line_number' => $lineNumber,
+            'label'       => $label,
+            'username'    => $username,
+            'secret'      => $secret,
+        ]);
+
+        $this->flash('success', 'Lijn "' . $label . '" toegevoegd. Vergeet niet een Full Reload te doen en het toestel te herstarten.');
+        redirect('?page=provision&action=lines&id=' . $phoneId);
+    }
+
+    public function delete_line(): void
+    {
+        $this->requireOperator();
+        $lineId = (int)$this->get('id', 0);
+        $line   = Database::fetchOne("SELECT * FROM provision_phone_lines WHERE id=?", [$lineId]);
+        if (!$line) redirect('?page=provision');
+
+        $phoneId = $line['phone_id'];
+        Database::query("DELETE FROM provision_phone_lines WHERE id=?", [$lineId]);
+
+        $this->flash('success', 'Lijn verwijderd. Vergeet niet een Full Reload te doen en het toestel te herstarten.');
+        redirect('?page=provision&action=lines&id=' . $phoneId);
+    }
+
     private function defaults(): array
     {
         return [

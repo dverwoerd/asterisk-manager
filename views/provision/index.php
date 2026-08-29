@@ -98,6 +98,8 @@ $provPath   = getSetting('provision_tftp_path', APP_ROOT . '/provision');
                     <a href="?page=provision&action=microsip&ext_id=<?= $p['extension_id'] ?>"
                        class="btn btn-sm btn-ghost" title="Download MicroSIP configuratie" download>💻 MicroSIP</a>
                     <?php endif; ?>
+                    <a href="?page=provision&action=lines&id=<?= $p['id'] ?>"
+                       class="btn btn-sm btn-ghost" title="Extra lijnen beheren (per-DID label)">☎ Lijnen</a>
                     <a href="?page=provision&action=edit&id=<?= $p['id'] ?>"
                        class="btn btn-sm btn-ghost"><?= t('edit') ?></a>
                     <a href="?page=provision&action=delete&id=<?= $p['id'] ?>"

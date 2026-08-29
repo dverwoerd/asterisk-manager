@@ -350,6 +350,39 @@ class YealinkProvisioning
             }
         }
 
+        // Extra telefoonlijnen (per-DID accounts op hetzelfde fysieke toestel)
+        // Deze tonen een vast label op het scherm, onafhankelijk van het telefoonboek
+        $phoneLines = Database::fetchAll(
+            "SELECT * FROM provision_phone_lines WHERE phone_id=? ORDER BY line_number",
+            [$phone['id']]
+        );
+        foreach ($phoneLines as $line) {
+            $n = (int)$line['line_number'];
+            $cfg .= "###################################################\n";
+            $cfg .= "## Extra lijn: " . $line['label'] . "\n";
+            $cfg .= "###################################################\n";
+            $cfg .= "account." . $n . ".enable = 1\n";
+            $cfg .= "account." . $n . ".label = " . $line['label'] . "\n";
+            $cfg .= "account." . $n . ".display_name = " . $line['label'] . "\n";
+            $cfg .= "account." . $n . ".auth_name = " . $line['username'] . "\n";
+            $cfg .= "account." . $n . ".user_name = " . $line['username'] . "\n";
+            $cfg .= "account." . $n . ".password = " . $line['secret'] . "\n";
+            $cfg .= "account." . $n . ".sip_server.1.address = " . $sipServer . "\n";
+            $cfg .= "account." . $n . ".sip_server.1.port = " . $sipPort . "\n";
+            $cfg .= "account." . $n . ".sip_server.1.expires = 3600\n";
+            $cfg .= "account." . $n . ".sip_server.1.retry_counts = 10\n";
+            $cfg .= "account." . $n . ".nat.nat_traversal = 1\n";
+            $cfg .= "account." . $n . ".nat.udp_update_enable = 1\n";
+            $cfg .= "account." . $n . ".nat.udp_update_time = 30\n";
+            $cfg .= "account." . $n . ".codec.1.enable = 1\n";
+            $cfg .= "account." . $n . ".codec.1.payload_type = PCMA\n";
+            $cfg .= "account." . $n . ".codec.2.enable = 1\n";
+            $cfg .= "account." . $n . ".codec.2.payload_type = PCMU\n";
+            $cfg .= "account." . $n . ".codec.3.enable = 1\n";
+            $cfg .= "account." . $n . ".codec.3.payload_type = G722\n";
+            $cfg .= "\n";
+        }
+
         return $cfg;
     }
 

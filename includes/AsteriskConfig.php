@@ -82,6 +82,13 @@ class AsteriskConfig
             $out .= $this->pjsipEndpoint($ext);
         }
 
+        // Extra telefoonlijnen (bv. per-DID lijn op hetzelfde fysieke toestel,
+        // zodat het toestel een vast label toont onafhankelijk van het telefoonboek)
+        $phoneLines = Database::fetchAll("SELECT * FROM provision_phone_lines");
+        foreach ($phoneLines as $line) {
+            $out .= $this->pjsipPhoneLine($line, $localNets);
+        }
+
         // Trunks
         foreach ($trunks as $trunk) {
             $type = $trunk['trunk_type'] ?? 'provider';
@@ -93,6 +100,47 @@ class AsteriskConfig
         }
 
         return $this->writeFile('pjsip.conf', $out);
+    }
+
+    private function pjsipPhoneLine(array $line, string $localNets = ''): string
+    {
+        $username = $line['username'];
+        $secret   = $line['secret'] ?? '';
+        $label    = $line['label'] ?? '';
+        $out      = '';
+
+        $out .= '[' . $username . "]\n";
+        $out .= "type=auth\n";
+        $out .= "auth_type=userpass\n";
+        $out .= 'username=' . $username . "\n";
+        $out .= 'password=' . $secret . "\n\n";
+
+        $out .= '[' . $username . "]\n";
+        $out .= "type=aor\n";
+        $out .= "max_contacts=1\n";
+        $out .= "remove_existing=yes\n";
+        $out .= "qualify_frequency=30\n\n";
+
+        $out .= '[' . $username . "]\n";
+        $out .= "type=endpoint\n";
+        $out .= "context=from-internal\n";
+        $out .= 'auth=' . $username . "\n";
+        $out .= 'aors=' . $username . "\n";
+        $out .= 'callerid=' . $label . ' <' . $username . ">\n";
+        $out .= "allow=ulaw,alaw,g722\n";
+        $out .= "dtmf_mode=rfc4733\n";
+        $out .= "direct_media=no\n";
+        $out .= "ice_support=no\n";
+        // Extra lijn - alleen intern netwerk toegestaan (registreert vanaf hetzelfde
+        // fysieke toestel als de hoofdextensie, dus geen externe ACL nodig)
+        $out .= "deny=0.0.0.0/0.0.0.0\n";
+        $out .= "permit=127.0.0.1/32\n";
+        $out .= "permit=172.16.0.0/12\n";
+        $out .= "permit=10.0.0.0/8\n";
+        $out .= "permit=192.168.0.0/16\n";
+        $out .= "\n";
+
+        return $out;
     }
 
     private function pjsipEndpoint(array $ext): string
@@ -673,6 +721,18 @@ class AsteriskConfig
     private function destinationLine(string $type, string $destination): string
     {
         $dest = $destination;
+
+        // Extra telefoonlijn (phone_line): bel direct de aparte SIP-lijn op het
+        // toestel die een vast label toont, onafhankelijk van het telefoonboek
+        if ($type === 'phone_line') {
+            $line = Database::fetchOne("SELECT * FROM provision_phone_lines WHERE id=?", [(int)$dest]);
+            if ($line) {
+                return " same => n,Dial(PJSIP/" . $line['username'] . ",20,tTr)\n"
+                     . " same => n,Hangup()\n";
+            }
+            return " same => n,Hangup()\n";
+        }
+
         return match ($type) {
             'extension'    => " same => n,Goto(from-internal," . $dest . ",1)\n",
             'queue'        => " same => n,Queue(" . $dest . ",tT)\n",

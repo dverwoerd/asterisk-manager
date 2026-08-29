@@ -35,6 +35,7 @@
                             'voicemail'   => 'Voicemail',
                             'announcement'=> 'Announcement',
                             'external'    => 'External Number',
+                            'phone_line'  => 'Extra Lijn (vast label op toestel)',
                             'hangup'      => 'Hangup',
                         ] as $v => $l): ?>
                         <option value="<?= $v ?>" <?= $route['destination_type']===$v?'selected':'' ?>><?= $l ?></option>
@@ -43,7 +44,25 @@
                 </div>
                 <div class="form-group">
                     <label>Destination *</label>
-                    <input type="text" name="destination" class="form-control mono" value="<?= sanitize($route['destination']) ?>" id="destInput" placeholder="Extension number, queue name...">
+                    <input type="text" name="destination" class="form-control mono" value="<?= sanitize($route['destination']) ?>" id="destInput" placeholder="Extension number, queue name..."
+                           style="<?= $route['destination_type']==='phone_line' ? 'display:none' : '' ?>">
+                    <select name="destination_line_select" id="destLineSelect" class="form-control"
+                            style="<?= $route['destination_type']==='phone_line' ? '' : 'display:none' ?>"
+                            onchange="document.getElementById('destInput').value=this.value">
+                        <option value="">— Kies een lijn —</option>
+                        <?php
+                        $allLines = Database::fetchAll(
+                            "SELECT pl.*, pp.mac_address FROM provision_phone_lines pl
+                             JOIN provision_phones pp ON pl.phone_id = pp.id
+                             ORDER BY pl.label"
+                        );
+                        foreach ($allLines as $pl):
+                        ?>
+                        <option value="<?= $pl['id'] ?>" <?= (string)$route['destination']===(string)$pl['id']?'selected':'' ?>>
+                            <?= sanitize($pl['label']) ?> (<?= sanitize($pl['mac_address']) ?>)
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
                     <small class="form-hint" id="destHint">Enter the extension number, queue name, etc.</small>
                 </div>
             </div>
@@ -77,9 +96,19 @@ const hints = {
     voicemail: 'Enter the mailbox number (e.g. 1001)',
     announcement: 'Enter the sound file name (e.g. welcome-message)',
     external: 'Enter the full phone number',
+    phone_line: 'Kies de extra lijn (per-DID label)',
     hangup: 'No destination needed',
 };
 function updateDestHint(val) {
     document.getElementById('destHint').textContent = hints[val] || '';
+    const input = document.getElementById('destInput');
+    const select = document.getElementById('destLineSelect');
+    if (val === 'phone_line') {
+        input.style.display = 'none';
+        select.style.display = '';
+    } else {
+        input.style.display = '';
+        select.style.display = 'none';
+    }
 }
 </script>
