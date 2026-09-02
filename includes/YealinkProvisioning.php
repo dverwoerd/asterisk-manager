@@ -65,13 +65,30 @@ class YealinkProvisioning
         $secret      = $ext['secret'];
         $codecs      = $ext['codecs'] ?? 'ulaw,alaw,g722';
 
-        // LET OP: oudere Yealink T4x modellen (o.a. T41S/T41P/T42G/T46G/T48G) hebben
-        // geen Nederlands taalpakket ingebouwd op het schermmenu (lang.gui). Als
-        // lang.gui op een taal staat die het toestel niet kent, toont het scherm
-        // rauwe resource-sleutels (bv. "S_History", "S_Menu") i.p.v. vertaalde tekst.
-        // De webinterface (lang.wui) ondersteunt meestal wel meer talen dan het schermmenu.
-        $modelsWithoutDutchLcd = ['T41S', 'T41P', 'T42G', 'T46G', 'T48G', 'T29G'];
+        // BELANGRIJK: Yealink levert GEEN Nederlands taalpakket standaard mee in de
+        // internationale firmware (bevestigd door Yealink support: hiervoor is
+        // "Speciale Dutch Firmware" via distributeur Lydis nodig). Zonder taalbestand
+        // valt lang.gui=Dutch terug op rauwe resource-sleutels (bv. "S_History").
+        // Oplossing: een custom NL-taalbestand hosten en via gui_lang.url laden.
         $model = $phone['model'] ?? '';
+
+        // Community NL-taalbestanden per modelserie (bron: github.com/XXLNet/Yealink-Dutch-Language-File)
+        $dutchLangFileMap = [
+            'T19' => 'SIP-T19_lang-Dutch.txt',
+            'T21' => 'SIP-T21_lang-Dutch.txt',
+            'T23' => 'SIP-T23_lang-Dutch.txt',
+            'T40' => 'SIP-T40_lang-Dutch.txt',
+            'T41' => 'SIP-T41_lang-Dutch.txt',
+            'T42' => 'SIP-T42_lang-Dutch.txt',
+            'T46' => 'SIP-T46_lang-Dutch.txt',
+        ];
+        $dutchLangFile = null;
+        foreach ($dutchLangFileMap as $prefix => $file) {
+            if (stripos($model, $prefix) === 0) {
+                $dutchLangFile = $file;
+                break;
+            }
+        }
 
         $langMap = [
             'Dutch'      => ['Dutch', 'Dutch'],
@@ -85,11 +102,17 @@ class YealinkProvisioning
         ];
         [$langWeb, $langLcd] = $langMap[$language] ?? ['English', 'English'];
 
-        // Val terug op Engels voor het schermmenu op modellen zonder NL-taalpakket,
-        // zodat softkeys nooit als rauwe tekst getoond worden. De webinterface
-        // (lang.wui) blijft wel op de gekozen taal staan.
-        if ($langLcd === 'Dutch' && in_array($model, $modelsWithoutDutchLcd, true)) {
-            $langLcd = 'English';
+        // Als Nederlands gevraagd is en we hebben een custom taalbestand voor dit
+        // model: laad dat via gui_lang.url en verwijs lang.gui naar de custom naam.
+        // Als er geen taalbestand beschikbaar is voor dit model: val terug op Engels
+        // i.p.v. een kapot scherm met rauwe resource-tekst te tonen.
+        $customLangName = null;
+        if ($langLcd === 'Dutch') {
+            if ($dutchLangFile) {
+                $customLangName = pathinfo($dutchLangFile, PATHINFO_FILENAME); // bv. SIP-T41_lang-Dutch
+            } else {
+                $langLcd = 'English';
+            }
         }
 
         $cfg  = "#!version:1.0.0.1\n";
@@ -145,7 +168,14 @@ class YealinkProvisioning
 
         // Taal
         $cfg .= "lang.wui = " . $langWeb . "\n";
-        $cfg .= "lang.gui = " . $langLcd . "\n\n";
+        if ($customLangName) {
+            // Custom NL-taalbestand laden vanaf onze eigen provisioning server
+            $langFileUrl = $baseUrl . '/lang/' . $dutchLangFile;
+            $cfg .= "gui_lang.url = " . $langFileUrl . "\n";
+            $cfg .= "lang.gui = " . $customLangName . "\n\n";
+        } else {
+            $cfg .= "lang.gui = " . $langLcd . "\n\n";
+        }
 
         // Voice
         $cfg .= "###################################################\n";
