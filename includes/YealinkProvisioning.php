@@ -74,12 +74,14 @@ class YealinkProvisioning
         $model = $phone['model'] ?? '';
 
         $langMap = [
-            'Dutch'    => ['Dutch', 'Dutch'],
-            'English'  => ['English', 'English'],
-            'German'   => ['German', 'German'],
-            'French'   => ['French', 'French'],
-            'Spanish'  => ['Spanish', 'Spanish'],
-            'Italian'  => ['Italian', 'Italian'],
+            'Dutch'      => ['Dutch', 'Dutch'],
+            'Nederlands' => ['Dutch', 'Dutch'],
+            'nl'         => ['Dutch', 'Dutch'],
+            'English'    => ['English', 'English'],
+            'German'     => ['German', 'German'],
+            'French'     => ['French', 'French'],
+            'Spanish'    => ['Spanish', 'Spanish'],
+            'Italian'    => ['Italian', 'Italian'],
         ];
         [$langWeb, $langLcd] = $langMap[$language] ?? ['English', 'English'];
 
