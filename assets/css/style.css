@@ -916,7 +916,7 @@ body.login-page {
 .login-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 36px;
     box-shadow: var(--shadow-lg);
 }
@@ -930,28 +930,30 @@ body.login-page {
 }
 .login-logo-icon { font-size: 32px; color: var(--accent); }
 .login-logo-name {
-    font-family: var(--font-mono);
-    font-size: 16px;
-    font-weight: 500;
-    letter-spacing: 0.15em;
+    font-family: var(--font-heading);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
     color: var(--text);
     line-height: 1;
 }
 .login-logo-sub {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.2em;
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
     color: var(--accent);
     margin-top: 2px;
 }
 
 .login-title {
-    font-family: var(--font-mono);
-    font-size: 14px;
-    font-weight: 400;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
     color: var(--text-muted);
     text-align: center;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     margin-bottom: 24px;
 }
@@ -963,9 +965,9 @@ body.login-page {
     margin-top: 20px;
     font-size: 11px;
     color: var(--text-dim);
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
 }
-.login-alert { margin: 16px 0 0; max-width: 380px; border-radius: 4px; }
+.login-alert { margin: 16px 0 0; max-width: 380px; border-radius: var(--radius); }
 
 /* ============================================================
    RESPONSIVE
