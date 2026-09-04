@@ -279,7 +279,7 @@ function doConnect() {
         use_preloaded_route: false,
     };
 
-    JsSIP.debug.enable('JsSIP:*');
+    JsSIP.debug.disable('JsSIP:*');
 
     try {
         ua = new JsSIP.UA(config);
