@@ -168,14 +168,14 @@ class YealinkProvisioning
 
         // Taal
         $cfg .= "lang.wui = " . $langWeb . "\n";
-        if ($customLangName) {
-            // Custom NL-taalbestand laden vanaf onze eigen provisioning server
-            $langFileUrl = $baseUrl . '/lang/' . $dutchLangFile;
-            $cfg .= "gui_lang.url = " . $langFileUrl . "\n";
-            $cfg .= "lang.gui = " . $customLangName . "\n\n";
-        } else {
-            $cfg .= "lang.gui = " . $langLcd . "\n\n";
-        }
+        // Getest en bevestigd: dit toestel heeft Nederlands gewoon ingebouwd
+        // (werkt correct bij handmatige keuze in het menu). Het eerdere probleem
+        // kwam van een externe/custom taalbestand-poging die het toestel in de war
+        // bracht. Daarom: gewoon de ingebouwde taal gebruiken, en expliciet eventueel
+        // eerder gecachete custom taalbestanden verwijderen zodat het toestel schoon
+        // teruggrijpt op zijn eigen ingebouwde Nederlandse resources.
+        $cfg .= "gui_lang.delete = http://localhost/all\n";
+        $cfg .= "lang.gui = " . $langLcd . "\n\n";
 
         // Voice
         $cfg .= "###################################################\n";
