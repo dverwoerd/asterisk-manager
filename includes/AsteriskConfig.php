@@ -102,6 +102,16 @@ class AsteriskConfig
         return $this->writeFile('pjsip.conf', $out);
     }
 
+    // Standaard ACL-regels (intern netwerk) gedeeld door extensies en telefoonlijnen
+    private function defaultAclLines(): string
+    {
+        return "deny=0.0.0.0/0.0.0.0\n"
+             . "permit=127.0.0.1/32\n"
+             . "permit=172.16.0.0/12\n"
+             . "permit=10.0.0.0/8\n"
+             . "permit=192.168.0.0/16\n";
+    }
+
     private function pjsipPhoneLine(array $line, string $localNets = ''): string
     {
         $username = $line['username'];
@@ -133,11 +143,7 @@ class AsteriskConfig
         $out .= "ice_support=no\n";
         // Extra lijn - alleen intern netwerk toegestaan (registreert vanaf hetzelfde
         // fysieke toestel als de hoofdextensie, dus geen externe ACL nodig)
-        $out .= "deny=0.0.0.0/0.0.0.0\n";
-        $out .= "permit=127.0.0.1/32\n";
-        $out .= "permit=172.16.0.0/12\n";
-        $out .= "permit=10.0.0.0/8\n";
-        $out .= "permit=192.168.0.0/16\n";
+        $out .= $this->defaultAclLines();
         $out .= "\n";
 
         return $out;
@@ -184,12 +190,8 @@ class AsteriskConfig
         $out .= 'dtmf_mode=' . $dtmf . "\n";
         $out .= "direct_media=no\n";
         $out .= "ice_support=no\n";
-        // ACL - standaard alleen intern netwerk
-        $out .= "deny=0.0.0.0/0.0.0.0\n";
-        $out .= "permit=127.0.0.1/32\n";
-        $out .= "permit=172.16.0.0/12\n";
-        $out .= "permit=10.0.0.0/8\n";
-        $out .= "permit=192.168.0.0/16\n";
+        // ACL - standaard alleen intern netwerk, plus eventuele extra toegestane IPs
+        $out .= $this->defaultAclLines();
         if (!empty($ext['allowed_ips'])) {
             foreach (array_filter(array_map('trim', explode(",", $ext['allowed_ips']))) as $allowedIp) {
                 $out .= "permit=" . $allowedIp . "\n";
@@ -304,114 +306,64 @@ class AsteriskConfig
         $resolvedIp = gethostbyname($host);
         $out        = '';
 
-        $out .= "; === PBX Trunk: " . $name . " (3CX/PBX) ===
-";
+        $out = "; === PBX Trunk: " . $name . " (3CX/PBX) ===\n";
 
         // Auth sectie
-        $out .= "[" . $name . "-auth]
-";
-        $out .= "type=auth
-";
-        $out .= "auth_type=userpass
-";
-        $out .= "username=" . $username . "
-";
-        $out .= "password=" . $password . "
-
-";
+        $out .= "[" . $name . "-auth]\n";
+        $out .= "type=auth\n";
+        $out .= "auth_type=userpass\n";
+        $out .= "username=" . $username . "\n";
+        $out .= "password=" . $password . "\n\n";
 
         // AOR sectie
-        $out .= "[" . $name . "-aor]
-";
-        $out .= "type=aor
-";
-        $out .= "contact=sip:" . $host . ":" . $port . "
-";
-        $out .= "qualify_frequency=30
-
-";
+        $out .= "[" . $name . "-aor]\n";
+        $out .= "type=aor\n";
+        $out .= "contact=sip:" . $host . ":" . $port . "\n";
+        $out .= "qualify_frequency=30\n\n";
 
         // Outbound endpoint
-        $out .= "[" . $name . "]
-";
-        $out .= "type=endpoint
-";
-        $out .= "transport=transport-udp
-";
-        $out .= "context=" . $context . "
-";
-        $out .= "aors=" . $name . "-aor
-";
-        $out .= "auth=" . $name . "-auth
-";
-        $out .= "outbound_auth=" . $name . "-auth
-";
-        $out .= "allow=" . $codecs . "
-";
-        $out .= "from_domain=" . $host . "
-";
-        $out .= "direct_media=no
-";
-        $out .= "rtp_symmetric=yes
-";
-        $out .= "force_rport=yes
-";
-        $out .= "rewrite_contact=yes
-";
-        $out .= "trust_id_inbound=yes
-";
-        $out .= "send_pai=yes
-";
-        $out .= "send_rpid=yes
-
-";
+        $out .= "[" . $name . "]\n";
+        $out .= "type=endpoint\n";
+        $out .= "transport=transport-udp\n";
+        $out .= "context=" . $context . "\n";
+        $out .= "aors=" . $name . "-aor\n";
+        $out .= "auth=" . $name . "-auth\n";
+        $out .= "outbound_auth=" . $name . "-auth\n";
+        $out .= "allow=" . $codecs . "\n";
+        $out .= "from_domain=" . $host . "\n";
+        $out .= "direct_media=no\n";
+        $out .= "rtp_symmetric=yes\n";
+        $out .= "force_rport=yes\n";
+        $out .= "rewrite_contact=yes\n";
+        $out .= "trust_id_inbound=yes\n";
+        $out .= "send_pai=yes\n";
+        $out .= "send_rpid=yes\n\n";
 
         // Inbound endpoint - IP gebaseerd, geen auth
-        $out .= "[" . $name . "-inbound]
-";
-        $out .= "type=endpoint
-";
-        $out .= "transport=transport-udp
-";
-        $out .= "context=" . $context . "
-";
-        $out .= "allow=" . $codecs . "
-";
-        $out .= "direct_media=no
-";
-        $out .= "rtp_symmetric=yes
-";
-        $out .= "force_rport=yes
-";
-        $out .= "rewrite_contact=yes
-";
-        $out .= "trust_id_inbound=yes
+        $out .= "[" . $name . "-inbound]\n";
+        $out .= "type=endpoint\n";
+        $out .= "transport=transport-udp\n";
+        $out .= "context=" . $context . "\n";
+        $out .= "allow=" . $codecs . "\n";
+        $out .= "direct_media=no\n";
+        $out .= "rtp_symmetric=yes\n";
+        $out .= "force_rport=yes\n";
+        $out .= "rewrite_contact=yes\n";
+        $out .= "trust_id_inbound=yes\n\n";
 
-";
-
-        $out .= "[" . $name . "-inbound]
-";
-        $out .= "type=aor
-";
-        $out .= "contact=sip:" . $host . ":" . $port . "
-
-";
+        $out .= "[" . $name . "-inbound]\n";
+        $out .= "type=aor\n";
+        $out .= "contact=sip:" . $host . ":" . $port . "\n\n";
 
         // Identify op IP
-        $out .= "[" . $name . "-inbound]
-";
-        $out .= "type=identify
-";
-        $out .= "endpoint=" . $name . "-inbound
-";
-        $out .= "match=" . $host . "
-";
+        $out .= "[" . $name . "-inbound]\n";
+        $out .= "type=identify\n";
+        $out .= "endpoint=" . $name . "-inbound\n";
+        $out .= "match=" . $host . "\n";
         if (!empty($resolvedIp) && $resolvedIp !== $host) {
-            $out .= "match=" . $resolvedIp . "
-";
+            $out .= "match=" . $resolvedIp . "\n";
         }
-        $out .= "
-";
+        $out .= "\n";
 
         return $out;
     }
@@ -471,46 +423,26 @@ class AsteriskConfig
         $company = Database::getSetting('company_name', 'PBX');
         $tz      = Database::getSetting('voicemail_timezone', 'Europe/Amsterdam');
 
-        $out  = "; Voicemail Configuration
-";
-        $out .= "; Generated by Asterisk Manager on " . date('Y-m-d H:i:s') . "
-";
-        $out .= "; DO NOT EDIT MANUALLY
+        $out  = "; Voicemail Configuration\n";
+        $out .= "; Generated by Asterisk Manager on " . date('Y-m-d H:i:s') . "\n";
+        $out .= "; DO NOT EDIT MANUALLY\n\n";
 
-";
+        $out .= "[general]\n";
+        $out .= "format=wav49|gsm|wav\n";
+        $out .= "serveremail=voicemail@" . Database::getSetting('asterisk_external_host', 'pbx.local') . "\n";
+        $out .= "attach=yes\n";
+        $out .= "skipms=3000\n";
+        $out .= "maxsilence=10\n";
+        $out .= "silencethreshold=128\n";
+        $out .= "maxlogins=3\n";
+        $out .= "emaildateformat=%A, %B %d, %Y at %r\n";
+        $out .= "pagerdateformat=%A, %B %d, %Y at %r\n";
+        $out .= "sendvoicemail=yes\n\n";
 
-        $out .= "[general]
-";
-        $out .= "format=wav49|gsm|wav
-";
-        $out .= "serveremail=voicemail@" . Database::getSetting('asterisk_external_host', 'pbx.local') . "
-";
-        $out .= "attach=yes
-";
-        $out .= "skipms=3000
-";
-        $out .= "maxsilence=10
-";
-        $out .= "silencethreshold=128
-";
-        $out .= "maxlogins=3
-";
-        $out .= "emaildateformat=%A, %B %d, %Y at %r
-";
-        $out .= "pagerdateformat=%A, %B %d, %Y at %r
-";
-        $out .= "sendvoicemail=yes
+        $out .= "[zonemessages]\n";
+        $out .= "amsterdam=Europe/Amsterdam|'vm-received' Q 'digits/at' IMp\n\n";
 
-";
-
-        $out .= "[zonemessages]
-";
-        $out .= "amsterdam=Europe/Amsterdam|'vm-received' Q 'digits/at' IMp
-
-";
-
-        $out .= "[default]
-";
+        $out .= "[default]\n";
         foreach ($extensions as $ext) {
             $pin      = !empty($ext['voicemail_pin']) ? $ext['voicemail_pin'] : '1234';
             $name     = $ext['full_name'] ?? $ext['extension'];
@@ -521,11 +453,9 @@ class AsteriskConfig
             if (!empty($greeting)) {
                 $out .= ',,|greeting=' . $greeting;
             }
-            $out .= "
-";
+            $out .= "\n";
         }
-        $out .= "
-";
+        $out .= "\n";
 
         return file_put_contents($this->configPath . '/voicemail.conf', $out) !== false;
     }
@@ -588,21 +518,9 @@ class AsteriskConfig
             if (!empty($cfNoAns)) {
                 $out .= ' same => n,Dial(Local/' . $cfNoAns . "@from-internal,60,tT)\n";
             } elseif ($cfVm && $vmOn) {
-                $vmGreeting = trim($ext['voicemail_greeting'] ?? '');
-                if (!empty($vmGreeting)) {
-                    $out .= ' same => n,Playback(' . $vmGreeting . ")\n";
-                    $out .= ' same => n,VoiceMail(' . $exten . "@default,su)\n";
-                } else {
-                    $out .= ' same => n,VoiceMail(' . $exten . "@default,u)\n";
-                }
+                $out .= $this->voicemailDialLine($exten, $ext['voicemail_greeting'] ?? '');
             } elseif ($vmOn) {
-                $vmGreeting2 = trim($ext['voicemail_greeting'] ?? '');
-                if (!empty($vmGreeting2)) {
-                    $out .= ' same => n,Playback(' . $vmGreeting2 . ")\n";
-                    $out .= ' same => n,VoiceMail(' . $exten . "@default,su)\n";
-                } else {
-                    $out .= ' same => n,VoiceMail(' . $exten . "@default,u)\n";
-                }
+                $out .= $this->voicemailDialLine($exten, $ext['voicemail_greeting'] ?? '');
             }
 
             $out .= " same => n,Hangup()\n\n";
@@ -716,6 +634,19 @@ class AsteriskConfig
         $out .= " same => n,Hangup(21)\n\n";
 
         return $out;
+    }
+
+    // Genereert de VoiceMail() dialplan-regel, met optionele eigen begroeting
+    // ervoor (custom greeting wordt via Playback afgespeeld, daarna VoiceMail
+    // met de 's' vlag zodat Asterisk zijn eigen begroeting overslaat).
+    private function voicemailDialLine(string $exten, string $greeting): string
+    {
+        $greeting = trim($greeting);
+        if (!empty($greeting)) {
+            return ' same => n,Playback(' . $greeting . ")\n"
+                 . ' same => n,VoiceMail(' . $exten . "@default,su)\n";
+        }
+        return ' same => n,VoiceMail(' . $exten . "@default,u)\n";
     }
 
     private function destinationLine(string $type, string $destination): string
