@@ -1,7 +1,9 @@
 /* ============================================================
    Asterisk Manager - Stylesheet
-   Design: Industrial Utilitarian — IBM Plex, monospace accents
+   Design: Pantronic huisstijl — Archivo (koppen) + Manrope (body),
+   afgestemd op pantronic.nl / pcshop-veenendaal.nl
    ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
     /* Pantronic huisstijl */
@@ -28,10 +30,12 @@
     --muted:        #f0f2f5;
     --sidebar-w:    240px;
     --topbar-h:     52px;
-    --radius:       6px;
+    --radius:       10px;
+    --radius-pill:  999px;
     --shadow:       0 1px 3px rgba(0,0,0,0.1);
     --shadow-lg:    0 4px 16px rgba(0,0,0,0.15);
-    --font-sans:    'Arial', Helvetica, sans-serif;
+    --font-sans:    'Manrope', Arial, Helvetica, sans-serif;
+    --font-heading: 'Archivo', 'Manrope', Arial, sans-serif;
     --font-mono:    'Courier New', monospace;
     --transition:   0.15s ease;
 }
@@ -51,6 +55,27 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
 input, select, textarea, button { font-family: inherit; font-size: inherit; }
 img { max-width: 100%; }
+
+h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    line-height: 1.2;
+}
+
+/* Klein label boven een titel, zoals "Wat wij doen" / "Ervaring" op
+   pantronic.nl en pcshop-veenendaal.nl */
+.eyebrow {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
 
 /* ============================================================
    SIDEBAR
@@ -94,10 +119,10 @@ img { max-width: 100%; }
 
 .logo-name {
     display: block;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.15em;
+    font-family: var(--font-heading);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
     color: var(--text);
     line-height: 1.1;
 }
@@ -339,9 +364,9 @@ img { max-width: 100%; }
 }
 
 .page-title {
-    font-size: 20px;
-    font-weight: 500;
-    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 800;
+    font-family: var(--font-heading);
     letter-spacing: -0.01em;
     color: var(--text);
 }
@@ -368,11 +393,11 @@ img { max-width: 100%; }
 }
 
 .card-title {
-    font-size: 13px;
-    font-weight: 500;
-    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+    font-family: var(--font-heading);
     color: var(--text);
-    letter-spacing: 0.03em;
+    letter-spacing: 0;
 }
 
 .card-body { padding: 16px; }
@@ -419,9 +444,9 @@ img { max-width: 100%; }
 }
 
 .stat-value {
-    font-family: var(--font-mono);
-    font-size: 22px;
-    font-weight: 500;
+    font-family: var(--font-heading);
+    font-size: 24px;
+    font-weight: 800;
     color: var(--text);
     line-height: 1;
     margin-bottom: 3px;
@@ -485,10 +510,11 @@ img { max-width: 100%; }
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 7px 14px;
-    border-radius: var(--radius);
+    padding: 8px 18px;
+    border-radius: var(--radius-pill);
     border: 1px solid transparent;
     font-size: 13px;
+    font-weight: 600;
     font-family: var(--font-sans);
     cursor: pointer;
     transition: all var(--transition);
@@ -502,7 +528,7 @@ img { max-width: 100%; }
     color: #ffffff;
     border: 1px solid var(--accent);
 }
-.btn-accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #000; }
+.btn-accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
 
 .btn-ghost {
     background: transparent;
@@ -530,9 +556,9 @@ img { max-width: 100%; }
     color: #ffffff;
     border: 1px solid var(--primary);
 }
-.btn-primary:hover { background: #2563eb; color: #fff; }
+.btn-primary:hover { background: var(--primary-hover); color: #fff; }
 
-.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-sm { padding: 5px 14px; font-size: 12px; }
 .btn-full { width: 100%; justify-content: center; }
 
 /* ============================================================
