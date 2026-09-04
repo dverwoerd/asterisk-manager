@@ -20,6 +20,17 @@ class ProvisionController extends BaseController
         ]);
     }
 
+    // Bouwt de gegroepeerde model-dropdown (Yealink + Gigaset), gedeeld door add() en edit()
+    private function modelOptions(): array
+    {
+        return array_merge(
+            ['--- Yealink ---' => ''],
+            YealinkProvisioning::getYealinkModels(),
+            ['--- Gigaset ---' => ''],
+            GigasetProvisioning::getModels()
+        );
+    }
+
     public function add(): void
     {
         $extensions = Database::fetchAll(
@@ -33,12 +44,7 @@ class ProvisionController extends BaseController
             'title'      => 'Add Phone',
             'phone'      => $this->defaults(),
             'extensions' => $extensions,
-            'models'     => array_merge(
-                ['--- Yealink ---' => ''], 
-                YealinkProvisioning::getYealinkModels(),
-                ['--- Gigaset ---' => ''],
-                GigasetProvisioning::getModels()
-            ),
+            'models'     => $this->modelOptions(),
             'timezones'  => YealinkProvisioning::getTimezones(),
             'languages'  => YealinkProvisioning::getLanguages(),
             'action'     => 'add',
@@ -74,12 +80,7 @@ class ProvisionController extends BaseController
             'phone'      => $phone,
             'blfKeys'    => $blfKeys,
             'extensions' => $extensions,
-            'models'     => array_merge(
-                ['--- Yealink ---' => ''], 
-                YealinkProvisioning::getYealinkModels(),
-                ['--- Gigaset ---' => ''],
-                GigasetProvisioning::getModels()
-            ),
+            'models'     => $this->modelOptions(),
             'timezones'  => YealinkProvisioning::getTimezones(),
             'languages'  => YealinkProvisioning::getLanguages(),
             'action'     => 'edit',
@@ -203,10 +204,11 @@ class ProvisionController extends BaseController
         ]);
     }
 
-    public function reboot(): void
+    // Haalt een toestel op inclusief het gekoppelde extensienummer, of toont een
+    // foutmelding en stuurt terug naar het overzicht als het toestel niet bestaat.
+    // Gedeeld door reboot() en reprovision().
+    private function getPhoneWithExtensionOrRedirect(int $id): array
     {
-        $this->requireOperator();
-        $id    = $this->id();
         $phone = Database::fetchOne(
             "SELECT pp.*, e.extension FROM provision_phones pp
              JOIN extensions e ON pp.extension_id = e.id
@@ -218,6 +220,15 @@ class ProvisionController extends BaseController
             $this->flash('danger', 'Toestel niet gevonden.');
             redirect('?page=provision');
         }
+
+        return $phone;
+    }
+
+    public function reboot(): void
+    {
+        $this->requireOperator();
+        $id    = $this->id();
+        $phone = $this->getPhoneWithExtensionOrRedirect($id);
 
         try {
             require_once APP_ROOT . '/includes/AsteriskAMI.php';
@@ -244,17 +255,7 @@ class ProvisionController extends BaseController
     {
         $this->requireOperator();
         $id    = $this->id();
-        $phone = Database::fetchOne(
-            "SELECT pp.*, e.extension FROM provision_phones pp
-             JOIN extensions e ON pp.extension_id = e.id
-             WHERE pp.id = ?",
-            [$id]
-        );
-
-        if (!$phone) {
-            $this->flash('danger', 'Toestel niet gevonden.');
-            redirect('?page=provision');
-        }
+        $phone = $this->getPhoneWithExtensionOrRedirect($id);
 
         // Genereer eerst een nieuwe config
         $this->generateConfig($id);
@@ -267,8 +268,7 @@ class ProvisionController extends BaseController
         }
 
         $phoneIp = null;
-        foreach (explode("
-", $cliOutput ?? '') as $line) {
+        foreach (explode("\n", $cliOutput ?? '') as $line) {
             if (preg_match('/^\s+Contact:\s+' . preg_quote($phone['extension']) . '\/sip:[^@]+@([\d.]+):(\d+)/', $line, $m)) {
                 $phoneIp = $m[1];
                 break;
@@ -415,97 +415,100 @@ class ProvisionController extends BaseController
         $secret  = $ext['secret'] ?? '';
 
         // Genereer MicroSIP INI configuratie (compatibel met MicroSIP v3.22)
-        $ini  = "[Global]\n";
-        $ini .= "version=3.22.12\n";
-        $ini .= "[Settings]\n";
-        $ini .= "accountId=1\n";
-        $ini .= "singleMode=1\n";
-        $ini .= "ringingSound=\n";
-        $ini .= "volumeRing=100\n";
-        $ini .= "audioRingDevice=\"\"\n";
-        $ini .= "audioOutputDevice=\"\"\n";
-        $ini .= "audioInputDevice=\"\"\n";
-        $ini .= "micAmplification=0\n";
-        $ini .= "swLevelAdjustment=0\n";
-        $ini .= "audioCodecs=PCMA/8000/1 PCMU/8000/1 G722/16000/1\n";
-        $ini .= "VAD=0\n";
-        $ini .= "EC=1\n";
-        $ini .= "forceCodec=0\n";
-        $ini .= "opusStereo=0\n";
-        $ini .= "disableMessaging=0\n";
-        $ini .= "disableVideo=0\n";
-        $ini .= "videoCaptureDevice=\"\"\n";
-        $ini .= "videoCodec=\n";
-        $ini .= "videoH264=1\n";
-        $ini .= "videoH263=1\n";
-        $ini .= "videoVP8=1\n";
-        $ini .= "videoVP9=1\n";
-        $ini .= "videoBitrate=256\n";
-        $ini .= "rport=1\n";
-        $ini .= "sourcePort=0\n";
-        $ini .= "rtpPortMin=0\n";
-        $ini .= "rtpPortMax=0\n";
-        $ini .= "dnsSrvNs=\n";
-        $ini .= "dnsSrv=0\n";
-        $ini .= "STUN=\n";
-        $ini .= "enableSTUN=0\n";
-        $ini .= "recordingPath=\n";
-        $ini .= "recordingFormat=\n";
-        $ini .= "autoRecording=0\n";
-        $ini .= "recordingButton=1\n";
-        $ini .= "buttonAC=1\n";
-        $ini .= "buttonCONF=1\n";
-        $ini .= "DTMFMethod=0\n";
-        $ini .= "autoAnswer=0\n";
-        $ini .= "autoAnswerDelay=0\n";
-        $ini .= "autoAnswerNumber=\n";
-        $ini .= "autoAnswerCalls=\n";
-        $ini .= "forwarding=\n";
-        $ini .= "forwardingNumber=\n";
-        $ini .= "forwardingDelay=0\n";
-        $ini .= "featureCodeCP=**\n";
-        $ini .= "featureCodeBT=##\n";
-        $ini .= "featureCodeAT=*2\n";
-        $ini .= "enableFeatureCodeCP=1\n";
-        $ini .= "enableFeatureCodeBT=0\n";
-        $ini .= "enableFeatureCodeAT=0\n";
-        $ini .= "denyIncoming=button\n";
-        $ini .= "usersDirectory=\n";
-        $ini .= "defaultAction=\n";
-        $ini .= "enableMediaButtons=0\n";
-        $ini .= "headsetSupport=0\n";
-        $ini .= "localDTMF=1\n";
-        $ini .= "enableLog=0\n";
-        $ini .= "bringToFrontOnIncoming=1\n";
-        $ini .= "enableLocalAccount=0\n";
-        $ini .= "randomAnswerBox=0\n";
-        $ini .= "disableNameLookup=0\n";
-        $ini .= "crashReport=1\n";
-        $ini .= "callWaiting=1\n";
-        $ini .= "multiMonitor=0\n";
-        $ini .= "networkChanges=1\n";
-        $ini .= "[Account1]\n";
-        $ini .= "label=" . $ext_num . "\n";
-        $ini .= "server=" . $server . "\n";
-        $ini .= "proxy=\n";
-        $ini .= "domain=" . $server . "\n";
-        $ini .= "username=" . $ext_num . "\n";
-        $ini .= "password=" . $secret . "\n";
-        $ini .= "authID=" . $ext_num . "\n";
-        $ini .= "displayName=" . $name . "\n";
-        $ini .= "dialingPrefix=\n";
-        $ini .= "dialPlan=\n";
-        $ini .= "hideCID=\n";
-        $ini .= "voicemailNumber=\n";
-        $ini .= "transport=udp\n";
-        $ini .= "publicAddr=\n";
-        $ini .= "SRTP=\n";
-        $ini .= "registerRefresh=300\n";
-        $ini .= "keepAlive=15\n";
-        $ini .= "publish=0\n";
-        $ini .= "ICE=0\n";
-        $ini .= "allowRewrite=0\n";
-        $ini .= "disableSessionTimer=0\n";
+        $ini = <<<INI
+        [Global]
+        version=3.22.12
+        [Settings]
+        accountId=1
+        singleMode=1
+        ringingSound=
+        volumeRing=100
+        audioRingDevice=""
+        audioOutputDevice=""
+        audioInputDevice=""
+        micAmplification=0
+        swLevelAdjustment=0
+        audioCodecs=PCMA/8000/1 PCMU/8000/1 G722/16000/1
+        VAD=0
+        EC=1
+        forceCodec=0
+        opusStereo=0
+        disableMessaging=0
+        disableVideo=0
+        videoCaptureDevice=""
+        videoCodec=
+        videoH264=1
+        videoH263=1
+        videoVP8=1
+        videoVP9=1
+        videoBitrate=256
+        rport=1
+        sourcePort=0
+        rtpPortMin=0
+        rtpPortMax=0
+        dnsSrvNs=
+        dnsSrv=0
+        STUN=
+        enableSTUN=0
+        recordingPath=
+        recordingFormat=
+        autoRecording=0
+        recordingButton=1
+        buttonAC=1
+        buttonCONF=1
+        DTMFMethod=0
+        autoAnswer=0
+        autoAnswerDelay=0
+        autoAnswerNumber=
+        autoAnswerCalls=
+        forwarding=
+        forwardingNumber=
+        forwardingDelay=0
+        featureCodeCP=**
+        featureCodeBT=##
+        featureCodeAT=*2
+        enableFeatureCodeCP=1
+        enableFeatureCodeBT=0
+        enableFeatureCodeAT=0
+        denyIncoming=button
+        usersDirectory=
+        defaultAction=
+        enableMediaButtons=0
+        headsetSupport=0
+        localDTMF=1
+        enableLog=0
+        bringToFrontOnIncoming=1
+        enableLocalAccount=0
+        randomAnswerBox=0
+        disableNameLookup=0
+        crashReport=1
+        callWaiting=1
+        multiMonitor=0
+        networkChanges=1
+        [Account1]
+        label={$ext_num}
+        server={$server}
+        proxy=
+        domain={$server}
+        username={$ext_num}
+        password={$secret}
+        authID={$ext_num}
+        displayName={$name}
+        dialingPrefix=
+        dialPlan=
+        hideCID=
+        voicemailNumber=
+        transport=udp
+        publicAddr=
+        SRTP=
+        registerRefresh=300
+        keepAlive=15
+        publish=0
+        ICE=0
+        allowRewrite=0
+        disableSessionTimer=0
+
+        INI;
 
         $filename = 'microsip-' . $ext_num . '.ini';
         header('Content-Type: text/plain; charset=utf-8');
