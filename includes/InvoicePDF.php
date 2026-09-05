@@ -28,7 +28,7 @@ class InvoicePDF
         ]);
 
         $mpdf->SetTitle('Factuur ' . $invoice['invoice_number']);
-        $mpdf->SetAuthor($company['name'] ?? 'Asterisk Manager');
+        $mpdf->SetAuthor($company['name'] ?? '');
 
         $html = self::buildHTML($invoice, $items, $company);
         $mpdf->WriteHTML($html);
