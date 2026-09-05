@@ -5,6 +5,19 @@
 
 require_once __DIR__ . '/config.php';
 
+// Beveiligde sessie-cookie instellingen (Secure/HttpOnly/SameSite)
+// - Secure: cookie wordt alleen over HTTPS verstuurd (voorkomt afluisteren)
+// - HttpOnly: cookie is niet toegankelijk via JavaScript (voorkomt XSS-diefstal)
+// - SameSite=Lax: beperkt verzenden van de cookie bij cross-site requests (CSRF-bescherming)
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'domain'   => '',
+    'secure'   => true,
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
+
 session_name(SESSION_NAME);
 session_start();
 
