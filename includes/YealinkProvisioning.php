@@ -363,6 +363,10 @@ class YealinkProvisioning
                         $cfg .= "linekey." . $k . ".extension = " . $pickup . "\n";
                         $cfg .= "linekey." . $k . ".pickup_value = " . $pickup . "\n";
                     }
+                } elseif ($k === 1) {
+                    // Toets 1 blijft standaard de lijntoets (anders kun je niet uitbellen)
+                    $cfg .= "linekey.1.type = 15\n";
+                    $cfg .= "linekey.1.line = 1\n";
                 } else {
                     $cfg .= "linekey." . $k . ".type = 0\n";
                 }
