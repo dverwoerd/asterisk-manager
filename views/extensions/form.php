@@ -345,7 +345,7 @@
     <div class="card mb-4">
         <div class="card-header"><h3 class="card-title">Aanwezigheidsstatus</h3></div>
         <div class="card-body">
-            <p class="form-hint">Wijzig de status op het toestel: <b>*71</b> Available, <b>*72</b> Away, <b>*73</b> Out of Office, <b>*70</b> status opvragen (1 piep = Available, 2 = Away, 3 = Out of Office). Leeg nummer = voicemail.</p>
+            <p class="form-hint">Wijzig de status op het toestel: <b>*71</b> Available, <b>*72</b> Away, <b>*73</b> Out of Office, <b>*70</b> status opvragen (gesproken melding). Leeg nummer = voicemail.</p>
             <div class="form-row">
                 <div class="form-group">
                     <label>Bij Away doorschakelen naar</label>

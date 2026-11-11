@@ -676,6 +676,7 @@ class AsteriskConfig
     {
         $out  = "; Aanwezigheidsstatus\n";
         $codes = ['*71' => ['available', 'Available'], '*72' => ['away', 'Away'], '*73' => ['ooo', 'Out of Office']];
+        $snd   = ['available' => 'status-aanwezig', 'away' => 'status-afwezig', 'ooo' => 'status-buiten-kantoor'];
         foreach ($codes as $code => [$val, $label]) {
             $out .= 'exten => ' . $code . ",1,NoOp(Status {$label} voor \${CALLERID(num)})\n";
             $out .= ' same => n,Answer()' . "\n";
@@ -684,7 +685,7 @@ class AsteriskConfig
             } else {
                 $out .= ' same => n,Set(DB(presence/${CALLERID(num)})=' . $val . ")\n";
             }
-            $out .= ' same => n,Playback(beep)' . "\n";
+            $out .= ' same => n,Playback(custom/' . $snd[$val] . ")\n";
             $out .= " same => n,Hangup()\n";
         }
         $out .= 'exten => *70,1,NoOp(Status opvragen)' . "\n";
@@ -692,11 +693,11 @@ class AsteriskConfig
         $out .= ' same => n,Set(PRES=${DB(presence/${CALLERID(num)})})' . "\n";
         $out .= ' same => n,GotoIf($["${PRES}" = "away"]?away)' . "\n";
         $out .= ' same => n,GotoIf($["${PRES}" = "ooo"]?ooo)' . "\n";
-        $out .= ' same => n,Playback(beep)' . "\n";
+        $out .= ' same => n,Playback(custom/status-aanwezig)' . "\n";
         $out .= ' same => n,Hangup()' . "\n";
-        $out .= ' same => n(away),Playback(beep&beep)' . "\n";
+        $out .= ' same => n(away),Playback(custom/status-afwezig)' . "\n";
         $out .= ' same => n,Hangup()' . "\n";
-        $out .= ' same => n(ooo),Playback(beep&beep&beep)' . "\n";
+        $out .= ' same => n(ooo),Playback(custom/status-buiten-kantoor)' . "\n";
         $out .= ' same => n,Hangup()' . "\n\n";
         return $out;
     }
