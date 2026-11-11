@@ -465,6 +465,7 @@ class AsteriskConfig
         $out  = $this->header('Extensions (Dialplan)');
         $out .= $this->generateFromInternal();
         $out .= $this->generateFromTrunk();
+        $out .= $this->generateAiVoice();
         $out .= "[from-internal-custom]\n; Add custom rules here\n\n";
         $out .= "[from-trunk-custom]\n; Add custom rules here\n\n";
         $out .= $this->generateCustomContexts();
@@ -533,6 +534,12 @@ class AsteriskConfig
 
             $out .= " same => n,Hangup()\n";
             $out .= $this->presenceBranches($ext, $awayFwd, $oooFwd) . "\n";
+        }
+
+        // AI-spraakassistent: bereikbaar als extensie (te gebruiken als bestemming van een inkomende route)
+        $aiExt = trim((string)getSetting('ai_voice_extension', ''));
+        if ($aiExt !== '') {
+            $out .= 'exten => ' . $aiExt . ",1,Goto(ai-voice,s,1)\n\n";
         }
 
         // Feature codes: status wijzigen vanaf het toestel
@@ -651,6 +658,25 @@ class AsteriskConfig
     // Genereert de VoiceMail() dialplan-regel, met optionele eigen begroeting
     // ervoor (custom greeting wordt via Playback afgespeeld, daarna VoiceMail
     // met de 's' vlag zodat Asterisk zijn eigen begroeting overslaat).
+    /** Context voor de AI-spraakassistent (zie ai-voice/README.md). */
+    private function generateAiVoice(): string
+    {
+        $aiExt = trim((string)getSetting('ai_voice_extension', ''));
+        if ($aiExt === '') return '';
+        $to   = preg_replace('/[^0-9A-Za-z_]/', '', (string)getSetting('ai_voice_transfer', '')) ?: '101';
+        $host = preg_replace('/[^0-9A-Za-z.:\-]/', '', (string)getSetting('ai_voice_host', '127.0.0.1:9092')) ?: '127.0.0.1:9092';
+        $out  = "[ai-voice]\n";
+        $out .= "exten => s,1,NoOp(AI-spraakassistent)\n";
+        $out .= " same => n,Answer()\n";
+        $out .= ' same => n,Set(AIUUID=${UUID()})' . "\n";
+        $out .= ' same => n,AudioSocket(${AIUUID},' . $host . ")\n";
+        $out .= ' same => n,GotoIf($["${DB(aivoice/${AIUUID})}" = "transfer"]?transfer)' . "\n";
+        $out .= " same => n,Hangup()\n";
+        $out .= ' same => n(transfer),Set(DUMMY=${DB_DELETE(aivoice/${AIUUID})})' . "\n";
+        $out .= ' same => n,Goto(from-internal,' . $to . ",1)\n\n";
+        return $out;
+    }
+
     /** Dialplan-takken voor status Away / Out of Office van een extensie. */
     private function presenceBranches(array $ext, string $awayFwd, string $oooFwd): string
     {

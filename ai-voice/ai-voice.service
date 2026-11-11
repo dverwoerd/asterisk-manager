@@ -1,0 +1,17 @@
+[Unit]
+Description=AI-spraakassistent (Asterisk AudioSocket)
+After=network.target asterisk.service
+
+[Service]
+User=asterisk
+Group=asterisk
+WorkingDirectory=/var/www/asterisk-manager/ai-voice
+EnvironmentFile=/etc/ai-voice.env
+ExecStart=/opt/piper/bin/python /var/www/asterisk-manager/ai-voice/voice_agent.py
+Restart=on-failure
+RestartSec=3
+# Modelcache voor Whisper
+Environment=HF_HOME=/var/lib/ai-voice/hf
+
+[Install]
+WantedBy=multi-user.target
