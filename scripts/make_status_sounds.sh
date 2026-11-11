@@ -1,11 +1,11 @@
 #!/bin/bash
 # Genereert gesproken Nederlandse statusmeldingen met Piper (neurale stem, natuurlijk).
 # Gebruik: sudo bash scripts/make_status_sounds.sh
-#   VOICE=nl_BE-nathalie-medium (vrouw, standaard) | nl_NL-mls-medium | nl_NL-pim-medium (man) | nl_NL-ronnie-medium (man)
+#   VOICE=nl_NL-ronnie-medium (man, standaard) | nl_NL-pim-medium (man) | nl_BE-nathalie-medium (vrouw, Vlaams)
 #   SPEED=1.15   (length_scale: hoger = langzamer)
 #   ENGINE=espeak  forceert de oude, robotachtige stem
 set -euo pipefail
-VOICE="${VOICE:-nl_BE-nathalie-medium}"
+VOICE="${VOICE:-nl_NL-ronnie-medium}"
 SPEED="${SPEED:-1.1}"
 ENGINE="${ENGINE:-piper}"
 OUT=/var/lib/asterisk/sounds/custom
