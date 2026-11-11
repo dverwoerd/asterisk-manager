@@ -202,6 +202,8 @@ class ExtensionsController extends BaseController
             'cf_noanswer'      => trim($this->post('cf_noanswer', '')),
             'cf_busy'          => trim($this->post('cf_busy', '')),
             'cf_voicemail'     => $this->post('cf_voicemail', 0) ? 1 : 0,
+            'away_forward'     => trim($this->post('away_forward', '')),
+            'ooo_forward'      => trim($this->post('ooo_forward', '')),
             'ring_time'        => (int)$this->post('ring_time', 20),
             'enabled'          => $this->post('enabled', 0) ? 1 : 0,
         ];

@@ -497,10 +497,18 @@ class AsteriskConfig
             $out .= ' same => n,Set(CALLERID(name)=' . $cidName . ")\n";
             $out .= ' same => n(skipcid' . $exten . '),NoOp()' . "\n";
 
+            // Aanwezigheidsstatus (via *71/*72/*73 op het toestel)
+            $awayFwd = trim($ext['away_forward'] ?? '');
+            $oooFwd  = trim($ext['ooo_forward'] ?? '');
+            $out .= ' same => n,Set(PRES=${DB(presence/' . $exten . ')})' . "\n";
+            $out .= ' same => n,GotoIf($["${PRES}" = "away"]?pres_away' . $exten . ')' . "\n";
+            $out .= ' same => n,GotoIf($["${PRES}" = "ooo"]?pres_ooo' . $exten . ')' . "\n";
+
             // Altijd doorschakelen
             if (!empty($cfAlways)) {
                 $out .= ' same => n,Dial(Local/' . $cfAlways . "@from-internal,60,tT)\n";
-                $out .= " same => n,Hangup()\n\n";
+                $out .= " same => n,Hangup()\n";
+                $out .= $this->presenceBranches($ext, $awayFwd, $oooFwd) . "\n";
                 continue;
             }
 
@@ -523,8 +531,12 @@ class AsteriskConfig
                 $out .= $this->voicemailDialLine($exten, $ext['voicemail_greeting'] ?? '');
             }
 
-            $out .= " same => n,Hangup()\n\n";
+            $out .= " same => n,Hangup()\n";
+            $out .= $this->presenceBranches($ext, $awayFwd, $oooFwd) . "\n";
         }
+
+        // Feature codes: status wijzigen vanaf het toestel
+        $out .= $this->presenceFeatureCodes();
 
         // Hints voor BLF/presence per extensie
         foreach ($extensions as $ext) {
@@ -639,6 +651,56 @@ class AsteriskConfig
     // Genereert de VoiceMail() dialplan-regel, met optionele eigen begroeting
     // ervoor (custom greeting wordt via Playback afgespeeld, daarna VoiceMail
     // met de 's' vlag zodat Asterisk zijn eigen begroeting overslaat).
+    /** Dialplan-takken voor status Away / Out of Office van een extensie. */
+    private function presenceBranches(array $ext, string $awayFwd, string $oooFwd): string
+    {
+        $exten = $ext['extension'];
+        $vmOn  = !empty($ext['voicemail_enabled']);
+        $out   = '';
+        foreach (['away' => $awayFwd, 'ooo' => $oooFwd] as $state => $target) {
+            $out .= ' same => n(pres_' . $state . $exten . '),NoOp(' . $exten . ' status ' . $state . ")\n";
+            if ($target !== '') {
+                $out .= ' same => n,Dial(Local/' . $target . "@from-internal,60,tT)\n";
+            } elseif ($vmOn) {
+                $out .= $this->voicemailDialLine($exten, $ext['voicemail_greeting'] ?? '');
+            } else {
+                $out .= " same => n,Busy(10)\n";
+            }
+            $out .= " same => n,Hangup()\n";
+        }
+        return $out;
+    }
+
+    /** *70 status opvragen, *71 Available, *72 Away, *73 Out of Office. */
+    private function presenceFeatureCodes(): string
+    {
+        $out  = "; Aanwezigheidsstatus\n";
+        $codes = ['*71' => ['available', 'Available'], '*72' => ['away', 'Away'], '*73' => ['ooo', 'Out of Office']];
+        foreach ($codes as $code => [$val, $label]) {
+            $out .= 'exten => ' . $code . ",1,NoOp(Status {$label} voor \${CALLERID(num)})\n";
+            $out .= ' same => n,Answer()' . "\n";
+            if ($val === 'available') {
+                $out .= ' same => n,Set(DUMMY=${DB_DELETE(presence/${CALLERID(num)})})' . "\n";
+            } else {
+                $out .= ' same => n,Set(DB(presence/${CALLERID(num)})=' . $val . ")\n";
+            }
+            $out .= ' same => n,Playback(beep)' . "\n";
+            $out .= " same => n,Hangup()\n";
+        }
+        $out .= 'exten => *70,1,NoOp(Status opvragen)' . "\n";
+        $out .= ' same => n,Answer()' . "\n";
+        $out .= ' same => n,Set(PRES=${DB(presence/${CALLERID(num)})})' . "\n";
+        $out .= ' same => n,GotoIf($["${PRES}" = "away"]?away)' . "\n";
+        $out .= ' same => n,GotoIf($["${PRES}" = "ooo"]?ooo)' . "\n";
+        $out .= ' same => n,Playback(beep)' . "\n";
+        $out .= ' same => n,Hangup()' . "\n";
+        $out .= ' same => n(away),Playback(beep&beep)' . "\n";
+        $out .= ' same => n,Hangup()' . "\n";
+        $out .= ' same => n(ooo),Playback(beep&beep&beep)' . "\n";
+        $out .= ' same => n,Hangup()' . "\n\n";
+        return $out;
+    }
+
     private function voicemailDialLine(string $exten, string $greeting): string
     {
         $greeting = trim($greeting);

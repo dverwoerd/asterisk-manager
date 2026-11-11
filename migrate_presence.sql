@@ -1,0 +1,3 @@
+ALTER TABLE extensions
+  ADD COLUMN away_forward VARCHAR(64) NOT NULL DEFAULT '',
+  ADD COLUMN ooo_forward  VARCHAR(64) NOT NULL DEFAULT '';
