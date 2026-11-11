@@ -21,15 +21,25 @@ class YealinkProvisioning
     ];
 
     private static array $keyTypes = [
-        'blf'        => 16,
+        // Yealink SIP-T4x linekey type-nummers
+        'conference' => 1,
+        'forward'    => 2,
+        'transfer'   => 3,
+        'hold'       => 4,
+        'dnd'        => 5,
+        'redial'     => 6,
+        'recall'     => 7,
+        'pickup'     => 9,
+        'park'       => 10,
+        'dtmf'       => 11,
+        'voicemail'  => 12,
         'speed_dial' => 13,
+        'intercom'   => 14,
         'line'       => 15,
-        'dtmf'       => 12,
-        'conference' => 9,
-        'forward'    => 7,
-        'transfer'   => 6,
-        'hold'       => 5,
-        'dnd'        => 4,
+        'blf'        => 16,
+        'url'        => 17,
+        'record'     => 25,
+        'prefix'     => 40,
     ];
 
     public static function generate(array $phone): string

@@ -207,7 +207,7 @@
                     </button>
                 </div>
                 <div class="card-body">
-                    <div style="display:grid;grid-template-columns:60px 100px 1fr 1fr 80px 30px;gap:6px;margin-bottom:6px;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">
+                    <div style="display:grid;grid-template-columns:50px 130px 1fr 1fr 1fr 60px 30px;gap:6px;margin-bottom:6px;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">
                         <span>KEY #</span>
                         <span>TYPE</span>
                         <span>LABEL</span>
@@ -221,11 +221,11 @@
                         <!-- Lege rij als voorbeeld -->
                         <?php else: ?>
                         <?php foreach ($blfKeys as $i => $key): ?>
-                        <div class="blf-row" style="display:grid;grid-template-columns:60px 100px 1fr 1fr 80px 30px;gap:6px;margin-bottom:6px;align-items:center">
+                        <div class="blf-row" style="display:grid;grid-template-columns:50px 130px 1fr 1fr 1fr 60px 30px;gap:6px;margin-bottom:6px;align-items:center">
                             <input type="number" name="key_numbers[]" class="form-control form-control-sm mono"
                                    value="<?= (int)$key['key_number'] ?>" min="1" max="40" placeholder="1">
                             <select name="key_types[]" class="form-control form-control-sm">
-                                <?php foreach (['blf'=>'BLF','speed_dial'=>'Speed Dial','dtmf'=>'DTMF','conference'=>'Conference','forward'=>'Forward','transfer'=>'Transfer','hold'=>'Hold','dnd'=>'DND'] as $v => $l): ?>
+                                <?php foreach (['blf'=>'BLF','speed_dial'=>'Speed Dial (nummer/code)','voicemail'=>'Voicemail','pickup'=>'Pickup','park'=>'Park','intercom'=>'Intercom','dtmf'=>'DTMF','conference'=>'Conference','forward'=>'Forward','transfer'=>'Transfer','hold'=>'Hold','dnd'=>'DND','redial'=>'Redial','record'=>'Record'] as $v => $l): ?>
                                 <option value="<?= $v ?>" <?= $key['key_type']===$v?'selected':'' ?>><?= $l ?></option>
                                 <?php endforeach; ?>
                             </select>
@@ -243,6 +243,8 @@
                                 </option>
                                 <?php endforeach; ?>
                             </select>
+                            <input type="text" name="key_values[]" class="form-control form-control-sm mono"
+                                   value="<?= sanitize($key['value']) ?>" placeholder="Nummer/code (bijv. *72)">
                             <input type="text" name="key_pickups[]" class="form-control form-control-sm mono"
                                    value="<?= sanitize($key['pickup_code'] ?? '*8') ?>" placeholder="*8">
                             <button type="button" class="btn btn-sm btn-danger-ghost"
@@ -250,13 +252,6 @@
                         </div>
                         <?php endforeach; ?>
                         <?php endif; ?>
-                    </div>
-
-                    <!-- Verborgen waarden voor handmatige invoer -->
-                    <div id="blfValues" style="display:none">
-                        <?php foreach ($blfKeys as $key): ?>
-                        <input name="key_values[]" value="<?= sanitize($key['value']) ?>">
-                        <?php endforeach; ?>
                     </div>
 
                     <small class="form-hint" style="margin-top:8px;display:block">
@@ -276,7 +271,11 @@
                     <button type="button" class="btn btn-ghost btn-sm" onclick="addAllExtensions()">
                         ⚡ Voeg alle extensies toe als BLF
                     </button>
-                    <small class="form-hint">Begint vanaf key 1. Bestaande keys worden overschreven.</small>
+                    <small class="form-hint">Voegt toe na de bestaande keys.</small>
+                    <p class="text-sm text-muted" style="margin:14px 0 10px">Status-toetsen (Available / Away / Out of Office):</p>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKeys()">
+                        Voeg status-toetsen toe (*71 / *72 / *73)
+                    </button>
                 </div>
             </div>
         </div>
@@ -330,14 +329,14 @@ function updateDisplayName(sel) {
     }
 }
 
-function addBLFKey(extId = '', extNum = '', extName = '', keyNum = null) {
+function addBLFKey(extId = '', extNum = '', extName = '', keyNum = null, type = 'blf', value = '', labelOverride = '') {
     const container = document.getElementById('blfContainer');
     const rows      = container.querySelectorAll('.blf-row');
     const nextKey   = keyNum || (rows.length + 1);
 
     const row = document.createElement('div');
     row.className = 'blf-row';
-    row.style.cssText = 'display:grid;grid-template-columns:60px 100px 1fr 1fr 80px 30px;gap:6px;margin-bottom:6px;align-items:center';
+    row.style.cssText = 'display:grid;grid-template-columns:50px 130px 1fr 1fr 1fr 60px 30px;gap:6px;margin-bottom:6px;align-items:center';
 
     let extOptions = '<option value="">Handmatig invoeren...</option>';
     allExtensions.forEach(e => {
@@ -345,34 +344,39 @@ function addBLFKey(extId = '', extNum = '', extName = '', keyNum = null) {
         extOptions += `<option value="${e.id}" data-ext="${e.extension}" data-name="${e.full_name}"${sel}>${e.extension} — ${e.full_name}</option>`;
     });
 
-    const label = extName || '';
+    const label = labelOverride || extName || '';
     const typeOptions = [
-        ['blf','BLF'],['speed_dial','Speed Dial'],['dtmf','DTMF'],
-        ['conference','Conference'],['forward','Forward'],['transfer','Transfer'],
-        ['hold','Hold'],['dnd','DND']
-    ].map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+        ['blf','BLF'],['speed_dial','Speed Dial (nummer/code)'],['voicemail','Voicemail'],['pickup','Pickup'],
+        ['park','Park'],['intercom','Intercom'],['dtmf','DTMF'],['conference','Conference'],
+        ['forward','Forward'],['transfer','Transfer'],['hold','Hold'],['dnd','DND'],
+        ['redial','Redial'],['record','Record']
+    ].map(([v,l]) => `<option value="${v}"${v===type?' selected':''}>${l}</option>`).join('');
 
     row.innerHTML = `
         <input type="number" name="key_numbers[]" class="form-control form-control-sm mono" value="${nextKey}" min="1" max="40">
         <select name="key_types[]" class="form-control form-control-sm">${typeOptions}</select>
         <input type="text" name="key_labels[]" class="form-control form-control-sm" value="${label}" placeholder="Label">
         <select name="key_ext_ids[]" class="form-control form-control-sm" onchange="updateKeyValue(this)">${extOptions}</select>
+        <input type="text" name="key_values[]" class="form-control form-control-sm mono" value="${value || extNum || ''}" placeholder="Nummer/code (bijv. *72)">
         <input type="text" name="key_pickups[]" class="form-control form-control-sm mono" value="*8" placeholder="*8">
         <button type="button" class="btn btn-sm btn-danger-ghost" onclick="this.closest('.blf-row').remove()">✕</button>
     `;
     container.appendChild(row);
+}
 
-    // Voeg lege value toe
-    const valContainer = document.getElementById('blfValues');
-    const valInput = document.createElement('input');
-    valInput.name = 'key_values[]';
-    valInput.value = extNum || '';
-    valContainer.appendChild(valInput);
+function addStatusKeys() {
+    const container = document.getElementById('blfContainer');
+    let next = container.querySelectorAll('.blf-row').length + 1;
+    [['Available','*71'],['Away','*72'],['Out of Office','*73']].forEach(([l, code]) => {
+        addBLFKey('', '', '', next++, 'speed_dial', code, l);
+    });
 }
 
 function updateKeyValue(sel) {
     const opt  = sel.options[sel.selectedIndex];
     const row  = sel.closest('.blf-row');
+    const valField = row.querySelector('input[name="key_values[]"]');
+    if (opt.dataset.ext && valField) valField.value = opt.dataset.ext;
     // Update label als het leeg is
     const labelField = row.querySelector('input[name="key_labels[]"]');
     if (!labelField.value && opt.dataset.name) {
