@@ -272,10 +272,10 @@
                         ⚡ Voeg alle extensies toe als BLF
                     </button>
                     <small class="form-hint">Voegt toe na de bestaande keys.</small>
-                    <p class="text-sm text-muted" style="margin:14px 0 10px">Status-toetsen (Available / Away / Out of Office):</p>
-                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKeys()">
-                        Voeg status-toetsen toe (*71 / *72 / *73)
-                    </button>
+                    <p class="text-sm text-muted" style="margin:14px 0 10px">Status-toetsen (één druk, geen code intoetsen). Het label kun je daarna zelf aanpassen:</p>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKey('Aanwezig','*71')">+ Aanwezig</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKey('Afwezig','*72')">+ Afwezig</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKey('Buiten kantoor','*73')">+ Buiten kantoor</button>
                 </div>
             </div>
         </div>
@@ -364,12 +364,9 @@ function addBLFKey(extId = '', extNum = '', extName = '', keyNum = null, type = 
     container.appendChild(row);
 }
 
-function addStatusKeys() {
-    const container = document.getElementById('blfContainer');
-    let next = container.querySelectorAll('.blf-row').length + 1;
-    [['Available','*71'],['Away','*72'],['Out of Office','*73']].forEach(([l, code]) => {
-        addBLFKey('', '', '', next++, 'speed_dial', code, l);
-    });
+function addStatusKey(label, code) {
+    const next = document.getElementById('blfContainer').querySelectorAll('.blf-row').length + 1;
+    addBLFKey('', '', '', next, 'speed_dial', code, label);
 }
 
 function updateKeyValue(sel) {
