@@ -211,7 +211,8 @@
                         <span>KEY #</span>
                         <span>TYPE</span>
                         <span>LABEL</span>
-                        <span>EXTENSIE / WAARDE</span>
+                        <span>EXTENSIE</span>
+                        <span>NUMMER / CODE</span>
                         <span>PICKUP</span>
                         <span></span>
                     </div>
