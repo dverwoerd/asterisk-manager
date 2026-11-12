@@ -68,7 +68,7 @@ class YealinkProvisioning
         $sipPort     = '5060';
         $ntpServer   = $phone['ntp_server'] ?? Database::getSetting('provision_ntp_server', 'pool.ntp.org');
         $adminPass   = $phone['admin_password'] ?? Database::getSetting('provision_admin_pass', 'admin');
-        $language    = $phone['language'] ?? 'Dutch';
+        $language    = $phone['language'] ?? 'English';
         $displayName = $phone['display_name'] ?: ($ext['full_name'] ?? $ext['extension']);
         $baseUrl     = rtrim(Database::getSetting('provision_base_url', ''), '/');
         $extension   = $ext['extension'];
@@ -84,9 +84,10 @@ class YealinkProvisioning
         // taalbestanden zodat het toestel schoon teruggrijpt op zijn eigen
         // ingebouwde resources i.p.v. rauwe resource-sleutels te tonen (bv. "S_History").
         $langMap = [
-            'Dutch'      => ['Dutch', 'Dutch'],
-            'Nederlands' => ['Dutch', 'Dutch'],
-            'nl'         => ['Dutch', 'Dutch'],
+            // Nederlands ontbreekt in de firmware van deze toestellen (geeft S_History/S_Menu): gebruik English
+            'Dutch'      => ['English', 'English'],
+            'Nederlands' => ['English', 'English'],
+            'nl'         => ['English', 'English'],
             'English'    => ['English', 'English'],
             'German'     => ['German', 'German'],
             'French'     => ['French', 'French'],
@@ -468,7 +469,6 @@ class YealinkProvisioning
     public static function getLanguages(): array
     {
         return [
-            'Dutch'    => 'Nederlands',
             'English'  => 'English',
             'German'   => 'Deutsch',
             'French'   => 'Français',

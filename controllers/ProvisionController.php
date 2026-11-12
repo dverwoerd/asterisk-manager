@@ -391,7 +391,7 @@ class ProvisionController extends BaseController
             'display_name'  => trim($this->post('display_name', '')),
             'timezone'      => $this->post('timezone', 'Europe/Amsterdam'),
             'ntp_server'    => trim($this->post('ntp_server', 'pool.ntp.org')),
-            'language'      => $this->post('language', 'Dutch'),
+            'language'      => $this->post('language', 'English'),
             'notes'            => trim($this->post('notes', '')),
             'extra_extensions'   => implode(',', array_filter(array_map('intval', $this->post('extra_extensions', [])))),
             'phonebook_group_id' => (int)$this->post('phonebook_group_id', 0) ?: null,
@@ -597,7 +597,7 @@ class ProvisionController extends BaseController
             'display_name'  => '',
             'timezone'      => getSetting('provision_timezone', 'Europe/Amsterdam'),
             'ntp_server'    => getSetting('provision_ntp_server', 'pool.ntp.org'),
-            'language'      => 'Dutch',
+            'language'      => 'English',
             'notes'         => '',
         ];
     }
