@@ -10,6 +10,7 @@ Start:  /opt/piper/bin/python voice_agent.py   (zie README.md en ai-voice.servic
 import asyncio, csv, json, logging, os, re, struct, subprocess, time
 from pathlib import Path
 import numpy as np
+import anthropic
 
 log = logging.getLogger("ai-voice")
 
@@ -126,7 +127,6 @@ class Engines:
     def __init__(self):
         from faster_whisper import WhisperModel
         from piper import PiperVoice, SynthesisConfig
-        import anthropic
         log.info("Modellen laden...")
         self.stt = WhisperModel(WHISPER, device="cpu", compute_type="int8")
         self.voice = PiperVoice.load(VOICE_PATH)
@@ -143,8 +143,13 @@ class Engines:
         return " ".join(s.text.strip() for s in segs).strip()
 
     def think(self, history: list) -> tuple:
-        r = self.llm.messages.create(model=MODEL, max_tokens=300, system=self.system, messages=history)
-        return parse_reply(r.content[0].text)
+        kw = dict(model=MODEL, max_tokens=400, system=self.system, messages=history)
+        try:
+            r = self.llm.messages.create(**kw, thinking={"type": "disabled"})   # sneller: geen denkstap
+        except anthropic.BadRequestError:
+            r = self.llm.messages.create(**kw)
+        text = "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
+        return parse_reply(text)
 
     def speak(self, text: str) -> bytes:
         """Tekst -> slin 8 kHz mono (bytes)."""
