@@ -35,3 +35,13 @@ def test_parse_reply():
 def test_catalogue():
     c = va.load_catalogue(va.CATALOGUE)
     assert "Voorbeeld Pro 3" in c and "prijs_eur: 299" in c
+
+
+def test_normalize_speech():
+    n = va.normalize_speech("De Pro 3 kost 299 euro, batterij 10 dagen, scherm 1.4 inch met GPS.")
+    assert "299" not in n and "GPS" not in n
+    if va.num2words:
+        assert "tweehonderdnegenennegentig" in n and "gee pee es" in n and "komma vier" in n
+
+def test_split_sentences():
+    assert va.split_sentences("Eerste zin. Tweede zin? Derde!") == ["Eerste zin.", "Tweede zin?", "Derde!"]

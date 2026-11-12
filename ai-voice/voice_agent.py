@@ -22,7 +22,8 @@ COMPANY      = os.getenv("AI_COMPANY", "Pantronic")
 MODEL        = os.getenv("AI_MODEL", "claude-haiku-5-5")
 WHISPER      = os.getenv("AI_WHISPER_MODEL", "small")
 VOICE_PATH   = os.getenv("AI_VOICE", "/opt/piper/voices/nl_NL-ronnie-medium.onnx")
-LENGTH_SCALE = float(os.getenv("AI_SPEED", "1.05"))
+LENGTH_SCALE = float(os.getenv("AI_SPEED", "0.92"))      # <1 = sneller praten
+SILENCE_S    = float(os.getenv("AI_SILENCE", "0.7"))      # stilte na zin voordat de assistent antwoordt
 MAX_TURNS    = int(os.getenv("AI_MAX_TURNS", "12"))
 MAX_SECONDS  = int(os.getenv("AI_MAX_SECONDS", "300"))
 
@@ -44,7 +45,8 @@ async def read_frame(reader):
 # ---------------- Spraakdetectie (energie, zelf-kalibrerend) ----------------
 class Endpointer:
     """Zet een stroom 20ms-frames om in uitingen (begin/einde van spraak)."""
-    def __init__(self, silence_s=0.9, min_speech_s=0.35, max_s=15.0):
+    def __init__(self, silence_s=None, min_speech_s=0.35, max_s=15.0):
+        silence_s = SILENCE_S if silence_s is None else silence_s
         self.silence_frames = int(silence_s / 0.02)
         self.min_frames = int(min_speech_s / 0.02)
         self.max_frames = int(max_s / 0.02)
@@ -86,6 +88,37 @@ class Endpointer:
         return None
 
 
+# ---------------- Uitspraak ----------------
+try:
+    from num2words import num2words
+except ImportError:                      # werkt ook zonder, maar getallen worden dan door Piper voorgelezen
+    num2words = None
+
+ABBREV = {
+    r"\bGPS\b": "gee pee es", r"\bECG\b": "eh cee gee", r"\bAMOLED\b": "amoled", r"\bLCD\b": "el cee dee",
+    r"\bATM\b": "atmosfeer", r"\bUSB\b": "joe es bee", r"\bSOS\b": "es oo es", r"\b4G\b": "vier gee",
+    r"\b5G\b": "vijf gee", r"\bNFC\b": "en eff cee", r"\bMIP\b": "mip", r"\bBluetooth\b": "bloetoeth",
+    r"\bandroid\b": "android", r"\biPhone\b": "ai foon", r"\bAndroid\b": "android",
+}
+
+
+def normalize_speech(text: str) -> str:
+    """Maakt tekst geschikt om uit te spreken: getallen, eenheden en afkortingen."""
+    for pat, rep in ABBREV.items():
+        text = re.sub(pat, rep, text)
+    text = re.sub(r"(\d+)\s*(?:€|euro)\b", r"\1 euro", text)
+    text = text.replace("€", " euro ")
+    if num2words:
+        text = re.sub(r"(\d+)[.,](\d+)", lambda m: f"{num2words(int(m[1]), lang='nl')} komma {num2words(int(m[2]), lang='nl')}", text)
+        text = re.sub(r"\d+", lambda m: num2words(int(m[0]), lang="nl"), text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def split_sentences(text: str) -> list:
+    parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", text) if p.strip()]
+    return parts or [text]
+
+
 # ---------------- Catalogus ----------------
 def load_catalogue(path: str) -> str:
     rows = list(csv.DictReader(open(path, encoding="utf-8")))
@@ -101,7 +134,8 @@ Regels:
 - Antwoord KORT (maximaal twee zinnen), gesproken taal, geen opsommingstekens, geen markdown.
 - Gebruik alleen informatie uit de catalogus hieronder. Verzin nooit prijzen, voorraad, specificaties of levertijden.
 - Weet je het niet, of vraagt de beller om een medewerker, klacht, retour, bestelling of iets buiten de catalogus: verbind door.
-- Noem prijzen als '299 euro'. Spel modelnamen uit zoals ze in de catalogus staan.
+- Schrijf alles zoals je het uitspreekt: noem prijzen als 'tweehonderd negenennegentig euro', schrijf getallen en eenheden uit in woorden ('zeven dagen', 'vijf atmosfeer'), geen cijfers of afkortingen.
+- Modelnamen mag je zo noemen als ze in de catalogus staan.
 - Stel hoogstens één wedervraag tegelijk om te kunnen adviseren.
 Antwoord ALTIJD als JSON: {{"zeg": "<wat je zegt>", "actie": "geen" | "doorverbinden" | "ophangen"}}
 Gebruik "ophangen" alleen na een afscheid van de beller.
@@ -128,7 +162,7 @@ class Engines:
         from faster_whisper import WhisperModel
         from piper import PiperVoice, SynthesisConfig
         log.info("Modellen laden...")
-        self.stt = WhisperModel(WHISPER, device="cpu", compute_type="int8")
+        self.stt = WhisperModel(WHISPER, device="cpu", compute_type="int8", cpu_threads=min(8, os.cpu_count() or 4))
         self.voice = PiperVoice.load(VOICE_PATH)
         self.syn_cfg = SynthesisConfig(length_scale=LENGTH_SCALE)
         self.llm = anthropic.Anthropic()          # ANTHROPIC_API_KEY uit omgeving
@@ -138,7 +172,7 @@ class Engines:
     def transcribe(self, pcm8k: bytes) -> str:
         a = np.frombuffer(pcm8k, dtype=np.int16).astype(np.float32) / 32768.0
         a16 = np.interp(np.arange(0, len(a), 0.5), np.arange(len(a)), a).astype(np.float32)  # 8k -> 16k
-        segs, _ = self.stt.transcribe(a16, language="nl", beam_size=1, vad_filter=False,
+        segs, _ = self.stt.transcribe(a16, language="nl", beam_size=1, vad_filter=False, condition_on_previous_text=False,
                                       initial_prompt="Smartwatch, prijs, batterij, hartslag, GPS, waterdicht.")
         return " ".join(s.text.strip() for s in segs).strip()
 
@@ -156,6 +190,7 @@ class Engines:
         pcm, rate = b"", 22050
         for ch in self.voice.synthesize(text, self.syn_cfg):
             pcm += ch.audio_int16_bytes; rate = ch.sample_rate
+        t = time.monotonic()
         out = subprocess.run(
             ["sox", "-t", "raw", "-r", str(rate), "-e", "signed", "-b", "16", "-c", "1", "-",
              "-t", "raw", "-r", str(RATE), "-e", "signed", "-b", "16", "-c", "1", "-"],
@@ -183,28 +218,39 @@ class Call:
             await asyncio.sleep(0.019)
 
     async def say(self, text: str):
-        pcm = await asyncio.to_thread(self.e.speak, text)
-        self.playing = asyncio.create_task(self.send_audio(pcm))
-        try:
-            await self.playing
-        except asyncio.CancelledError:
-            if not self.playing.cancelled():   # buitenste taak geannuleerd, niet alleen het afspelen
-                raise
-        finally:
-            self.playing = None
+        # zin voor zin: de volgende zin wordt al gemaakt terwijl de vorige wordt afgespeeld
+        parts = split_sentences(normalize_speech(text))
+        make = lambda t: asyncio.create_task(asyncio.to_thread(self.e.speak, t))
+        nxt, interrupted = make(parts[0]), False
+        for i in range(len(parts)):
+            pcm = await nxt
+            nxt = make(parts[i + 1]) if i + 1 < len(parts) else None
+            self.playing = asyncio.create_task(self.send_audio(pcm))
+            try:
+                await self.playing
+            except asyncio.CancelledError:
+                if not self.playing.cancelled():   # buitenste taak geannuleerd, niet alleen het afspelen
+                    raise
+                interrupted = True
+            finally:
+                self.playing = None
+            if interrupted:
+                break
 
     async def handle_utterance(self, pcm: bytes):
         self.busy = True
         try:
+            t0 = time.monotonic()
             text = await asyncio.to_thread(self.e.transcribe, pcm)
-            log.info("[%s] beller: %s", self.uuid[:8], text)
+            t1 = time.monotonic()
+            log.info("[%s] beller: %s  (STT %.1fs)", self.uuid[:8], text, t1 - t0)
             if len(text) < 2:
                 return
             self.turns += 1
             self.history.append({"role": "user", "content": text})
             say, action = await asyncio.to_thread(self.e.think, self.history[-20:])
             self.history.append({"role": "assistant", "content": json.dumps({"zeg": say, "actie": action}, ensure_ascii=False)})
-            log.info("[%s] AI (%s): %s", self.uuid[:8], action, say)
+            log.info("[%s] AI (%s): %s  (LLM %.1fs)", self.uuid[:8], action, say, time.monotonic() - t1)
             if self.turns >= MAX_TURNS or time.monotonic() - self.started > MAX_SECONDS:
                 say, action = "Ik verbind u door met een medewerker.", "doorverbinden"
             if say:

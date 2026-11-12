@@ -10,7 +10,7 @@ Keten: Asterisk (AudioSocket) -> Whisper (STT, lokaal) -> Claude (antwoord) -> P
 cd /var/www/asterisk-manager && git pull
 sudo bash scripts/make_status_sounds.sh          # installeert o.a. /opt/piper en de stem Ronnie (als dat nog niet is gedaan)
 sudo apt install -y sox
-sudo /opt/piper/bin/pip install anthropic faster-whisper numpy
+sudo /opt/piper/bin/pip install anthropic faster-whisper numpy num2words
 sudo mkdir -p /var/lib/ai-voice/hf && sudo chown asterisk:asterisk /var/lib/ai-voice/hf
 # De dienst draait als gebruiker 'asterisk' en heeft geen toegang tot /var/www: kopieer naar /opt/ai-voice
 sudo install -d -o asterisk -g asterisk /opt/ai-voice
