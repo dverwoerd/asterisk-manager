@@ -1,5 +1,8 @@
+*.log
+*.pyc
+.pytest_cache/
+__pycache__/
 config.php
 logs/
 provision/*.cfg
 provision/*.xml
-*.log
