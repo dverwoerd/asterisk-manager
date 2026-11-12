@@ -5,9 +5,9 @@ After=network.target asterisk.service
 [Service]
 User=asterisk
 Group=asterisk
-WorkingDirectory=/var/www/asterisk-manager/ai-voice
+WorkingDirectory=/opt/ai-voice
 EnvironmentFile=/etc/ai-voice.env
-ExecStart=/opt/piper/bin/python /var/www/asterisk-manager/ai-voice/voice_agent.py
+ExecStart=/opt/piper/bin/python /opt/ai-voice/voice_agent.py
 Restart=on-failure
 RestartSec=3
 # Modelcache voor Whisper

@@ -12,6 +12,9 @@ sudo bash scripts/make_status_sounds.sh          # installeert o.a. /opt/piper e
 sudo apt install -y sox
 sudo /opt/piper/bin/pip install anthropic faster-whisper numpy
 sudo mkdir -p /var/lib/ai-voice/hf && sudo chown asterisk:asterisk /var/lib/ai-voice/hf
+# De dienst draait als gebruiker 'asterisk' en heeft geen toegang tot /var/www: kopieer naar /opt/ai-voice
+sudo install -d -o asterisk -g asterisk /opt/ai-voice
+sudo cp ai-voice/voice_agent.py ai-voice/catalogue.csv /opt/ai-voice/ && sudo chown -R asterisk:asterisk /opt/ai-voice
 sudo cp ai-voice/ai-voice.env.example /etc/ai-voice.env && sudo chmod 600 /etc/ai-voice.env
 sudo nano /etc/ai-voice.env                      # vul ANTHROPIC_API_KEY in
 sudo cp ai-voice/ai-voice.service /etc/systemd/system/ && sudo systemctl daemon-reload
@@ -31,8 +34,8 @@ ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value);
 Maak daarna een inkomende route met als bestemming **Extensie 880**, of bel 880 intern om te testen.
 
 ## Catalogus
-`catalogue.csv` is een voorbeeld. Vervang door de echte producten (kolommen zijn vrij; elke kolom wordt aan de assistent meegegeven).
-Na wijziging: `sudo systemctl restart ai-voice`. Houd de catalogus onder ca. 200 producten; groter vraagt zoeken/RAG.
+`/opt/ai-voice/catalogue.csv` is een voorbeeld. Vervang door de echte producten (kolommen zijn vrij; elke kolom wordt aan de assistent meegegeven).
+Na wijziging van de catalogus of van `voice_agent.py` (opnieuw kopiëren vanuit de repo): `sudo systemctl restart ai-voice`. Houd de catalogus onder ca. 200 producten; groter vraagt zoeken/RAG.
 
 ## Tests
 `/opt/piper/bin/pip install pytest && cd ai-voice && /opt/piper/bin/python -m pytest -q`
