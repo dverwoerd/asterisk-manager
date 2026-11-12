@@ -543,7 +543,7 @@ class AsteriskConfig
         }
 
         // Feature codes: status wijzigen vanaf het toestel
-        $out .= $this->presenceFeatureCodes($extensions);
+        $out .= $this->presenceFeatureCodes();
 
         // Hints voor BLF/presence per extensie
         foreach ($extensions as $ext) {
@@ -697,27 +697,8 @@ class AsteriskConfig
         return $out;
     }
 
-    /** Regels die status ${E} opslaan en de lampjes (Custom device states) bijwerken. */
-    private function presenceApplyLines(string $state): string
-    {
-        $o = '';
-        if ($state === 'available') {
-            $o .= ' same => n,Set(DUMMY=${DB_DELETE(presence/${E})})' . "\n";
-        } else {
-            $o .= ' same => n,Set(DB(presence/${E})=' . $state . ")\n";
-        }
-        foreach (['available' => 'a', 'away' => 'w', 'ooo' => 'o'] as $st => $c) {
-            $o .= ' same => n,Set(DEVICE_STATE(Custom:pres${E}' . $c . ')=' . ($st === $state ? 'INUSE' : 'NOT_INUSE') . ")\n";
-        }
-        return $o;
-    }
-
-    /**
-     * *70 status opvragen; *71/*72/*73 eigen status zetten;
-     * *81<nr>/*82<nr>/*83<nr> zet de status van <nr> (alleen door het toestel zelf) en heeft een
-     * hint, zodat een BLF-toets de actieve status als lampje toont.
-     */
-    private function presenceFeatureCodes(array $extensions = []): string
+    /** *70 status opvragen; *71 Available, *72 Away, *73 Out of Office (eigen toestel). */
+    private function presenceFeatureCodes(): string
     {
         $out  = "; Aanwezigheidsstatus\n";
         $snd  = ['available' => 'status-aanwezig', 'away' => 'status-afwezig', 'ooo' => 'status-buiten-kantoor'];
@@ -725,8 +706,11 @@ class AsteriskConfig
         foreach ($gen as $code => $val) {
             $out .= 'exten => ' . $code . ",1,NoOp(Status {$val} voor \${CALLERID(num)})\n";
             $out .= ' same => n,Answer()' . "\n";
-            $out .= ' same => n,Set(E=${CALLERID(num)})' . "\n";
-            $out .= $this->presenceApplyLines($val);
+            if ($val === 'available') {
+                $out .= ' same => n,Set(DUMMY=${DB_DELETE(presence/${CALLERID(num)})})' . "\n";
+            } else {
+                $out .= ' same => n,Set(DB(presence/${CALLERID(num)})=' . $val . ")\n";
+            }
             $out .= ' same => n,Playback(custom/' . $snd[$val] . ")\n";
             $out .= " same => n,Hangup()\n";
         }
@@ -741,24 +725,7 @@ class AsteriskConfig
         $out .= ' same => n,Hangup()' . "\n";
         $out .= ' same => n(ooo),Playback(custom/status-buiten-kantoor)' . "\n";
         $out .= ' same => n,Hangup()' . "\n\n";
-
-        // Per extensie: BLF-toetsen met lampje
-        $per = ['1' => ['available', 'a'], '2' => ['away', 'w'], '3' => ['ooo', 'o']];
-        foreach ($extensions as $ext) {
-            $n = $ext['extension'];
-            foreach ($per as $d => [$val, $c]) {
-                $code = '*8' . $d . $n;
-                $out .= 'exten => ' . $code . ',hint,Custom:pres' . $n . $c . "\n";
-                $out .= 'exten => ' . $code . ",1,NoOp(Status {$val} via toets voor {$n})\n";
-                $out .= ' same => n,GotoIf($["${CALLERID(num)}" != "' . $n . '"]?end)' . "\n";
-                $out .= ' same => n,Answer()' . "\n";
-                $out .= ' same => n,Set(E=' . $n . ")\n";
-                $out .= $this->presenceApplyLines($val);
-                $out .= ' same => n,Playback(custom/' . $snd[$val] . ")\n";
-                $out .= ' same => n(end),Hangup()' . "\n";
-            }
-        }
-        return $out . "\n";
+        return $out;
     }
 
     private function voicemailDialLine(string $exten, string $greeting): string

@@ -274,10 +274,10 @@
                     </button>
                     <small class="form-hint">Voegt toe na de bestaande keys.</small>
                     <p class="text-sm text-muted" style="margin:14px 0 10px">Status-toetsen (één druk, geen code intoetsen). Het label kun je daarna zelf aanpassen:</p>
-                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKey('Aanwezig','1')">+ Aanwezig</button>
-                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKey('Afwezig','2')">+ Afwezig</button>
-                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKey('Buiten kantoor','3')">+ Buiten kantoor</button>
-                    <small class="form-hint" style="display:block;margin-top:6px">Het lampje van de toets brandt bij de actieve status. Kies eerst de extensie van dit toestel.</small>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKey('Aanwezig','*71')">+ Aanwezig</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKey('Afwezig','*72')">+ Afwezig</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="addStatusKey('Buiten kantoor','*73')">+ Buiten kantoor</button>
+
                 </div>
             </div>
         </div>
@@ -366,14 +366,9 @@ function addBLFKey(extId = '', extNum = '', extName = '', keyNum = null, type = 
     container.appendChild(row);
 }
 
-function addStatusKey(label, digit) {
-    const sel = document.querySelector('select[name="extension_id"]');
-    const opt = sel && sel.options[sel.selectedIndex];
-    const ext = opt && opt.value ? opt.text.trim().split(/\s+/)[0] : '';
-    if (!ext) { alert('Kies eerst de extensie van dit toestel.'); return; }
+function addStatusKey(label, code) {
     const next = document.getElementById('blfContainer').querySelectorAll('.blf-row').length + 1;
-    // BLF-toets op *8<status><extensie>: toont de status als lampje en zet hem bij indrukken
-    addBLFKey('', '', '', next, 'blf', '*8' + digit + ext, label);
+    addBLFKey('', '', '', next, 'speed_dial', code, label);
 }
 
 function updateKeyValue(sel) {
