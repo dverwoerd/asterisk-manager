@@ -64,9 +64,10 @@ $routes = [
     'provision'       => 'ProvisionController',
     'phonebook'       => 'PhonebookController',
     'security'        => 'SecurityController',
-    'sounds'          => 'SoundsController',
-    'login'           => 'AuthController',
-    'logout'          => 'AuthController',
+    'sounds'                => 'SoundsController',
+    'gesprekspecificaties'  => 'GesprekspecificatiesController',
+    'login'                 => 'AuthController',
+    'logout'                => 'AuthController',
 ];
 
 $controllerClass = $routes[$page] ?? 'DashboardController';

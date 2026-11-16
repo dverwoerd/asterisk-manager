@@ -72,6 +72,9 @@
         <a href="?page=rate_plans" class="nav-item<?= activeNav('rate_plans') ?>">
             <span class="nav-icon">€</span><span class="nav-label"><?= t('nav_rate_plans') ?></span>
         </a>
+        <a href="?page=gesprekspecificaties" class="nav-item<?= activeNav('gesprekspecificaties') ?>">
+            <span class="nav-icon">📞</span><span class="nav-label"><?= t('nav_gesprekspecificaties') ?></span>
+        </a>
 
         <div class="nav-section-label">PROVISIONING</div>
         <a href="?page=provision" class="nav-item<?= activeNav('provision') ?>">
