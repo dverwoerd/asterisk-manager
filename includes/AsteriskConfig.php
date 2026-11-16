@@ -141,6 +141,10 @@ class AsteriskConfig
         $out .= "dtmf_mode=rfc4733\n";
         $out .= "direct_media=no\n";
         $out .= "ice_support=no\n";
+        // NAT: toestellen die hun privé-adres in de registratie zetten bereiken we op het bronadres
+        $out .= "rtp_symmetric=yes\n";
+        $out .= "force_rport=yes\n";
+        $out .= "rewrite_contact=yes\n";
         // Extra lijn - alleen intern netwerk toegestaan (registreert vanaf hetzelfde
         // fysieke toestel als de hoofdextensie, dus geen externe ACL nodig)
         $out .= $this->defaultAclLines();
@@ -190,6 +194,10 @@ class AsteriskConfig
         $out .= 'dtmf_mode=' . $dtmf . "\n";
         $out .= "direct_media=no\n";
         $out .= "ice_support=no\n";
+        // NAT: toestellen die hun privé-adres in de registratie zetten bereiken we op het bronadres
+        $out .= "rtp_symmetric=yes\n";
+        $out .= "force_rport=yes\n";
+        $out .= "rewrite_contact=yes\n";
         // ACL - standaard alleen intern netwerk, plus eventuele extra toegestane IPs
         $out .= $this->defaultAclLines();
         if (!empty($ext['allowed_ips'])) {
