@@ -847,6 +847,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 .invoice-total td { border-top: 2px solid var(--accent); }
 .invoice-total-amount { font-size: 18px; color: var(--accent); }
 .text-right { text-align: right; }
+.data-table th.text-right  { text-align: right; }
+.data-table th.text-center { text-align: center; }
 
 .invoice-notes {
     margin-top: 24px;

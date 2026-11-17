@@ -126,12 +126,7 @@ class GesprekspecificatiesController extends BaseController
         ];
 
         require_once APP_ROOT . '/includes/GesprekPDF.php';
-        GesprekPDF::download(
-            $customer['company_name'] ?: $customer['contact_name'],
-            $this->maandNaam($mnr) . ' ' . $jaar,
-            $spec,
-            $company
-        );
+        GesprekPDF::download($customer, $company, $this->maandNaam($mnr) . ' ' . $jaar, $spec);
     }
 
     // ================================================================
@@ -149,7 +144,7 @@ class GesprekspecificatiesController extends BaseController
     {
         $cats = [];
         foreach (self::CATEGORIEEN as $cat) {
-            $cats[$cat] = ['aantal' => 0, 'minuten' => 0, 'sec' => 0, 'e4' => 0];
+            $cats[$cat] = ['aantal' => 0, 'minuten' => 0, 'sec' => 0, 'e4' => 0, 'nummers' => []];
         }
 
         $nummers = [];
@@ -161,6 +156,20 @@ class GesprekspecificatiesController extends BaseController
             $cats[$cat]['minuten'] += $c['minuten'];
             $cats[$cat]['sec']     += (int)$c['billsec'];
             $cats[$cat]['e4']      += $c['kosten_e4'];
+
+            // Per categorie: gesprekken gegroepeerd per nummer (voor detail-tabellen)
+            $cn = &$cats[$cat]['nummers'][$c['nummer']];
+            if ($cn === null) {
+                $cn = ['nummer' => self::toonNummer($c['nummer']), 'land' => $c['land'],
+                       'tarief_bekend' => $c['tarief_bekend'],
+                       'aantal' => 0, 'minuten' => 0, 'sec' => 0, 'e4' => 0, 'calls' => []];
+            }
+            $cn['aantal']  += 1;
+            $cn['minuten'] += $c['minuten'];
+            $cn['sec']     += (int)$c['billsec'];
+            $cn['e4']      += $c['kosten_e4'];
+            $cn['calls'][]  = $c;
+            unset($cn);
 
             $key = $c['nummer'];
             if (!isset($nummers[$key])) {
@@ -192,6 +201,14 @@ class GesprekspecificatiesController extends BaseController
 
         foreach ($cats as &$g) {
             $g['kosten'] = $g['e4'] / 10000;
+            foreach ($g['nummers'] as &$cn) {
+                $cn['kosten'] = $cn['e4'] / 10000;
+            }
+            unset($cn);
+            // hoogste kosten eerst, dan meeste gesprekken, dan nummer
+            uasort($g['nummers'], fn($a, $b) =>
+                [$b['e4'], $b['aantal'], $a['nummer']] <=> [$a['e4'], $a['aantal'], $b['nummer']]);
+            $g['nummers'] = array_values($g['nummers']);
         }
         unset($g);
 
