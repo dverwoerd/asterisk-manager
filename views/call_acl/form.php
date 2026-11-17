@@ -17,11 +17,18 @@
                     </div>
                     <div class="form-group">
                         <label>Toestellen in deze groep</label>
+                        <style>
+                        .acl-ext{display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border,#2a2f3a);border-radius:6px;cursor:pointer;transition:background .15s,border-color .15s}
+                        .acl-ext:hover{border-color:var(--accent)}
+                        .acl-ext input{accent-color:var(--accent)}
+                        .acl-ext.on{background:rgba(255,255,255,.07);border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+                        </style>
                         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">
-                            <?php foreach ($extensions as $e): ?>
-                            <label class="toggle-label" style="display:flex;gap:8px;align-items:center">
-                                <input type="checkbox" name="members[]" value="<?= sanitize($e['extension']) ?>" <?= in_array($e['extension'], $members) ? 'checked' : '' ?>>
-                                <span class="mono"><?= sanitize($e['extension']) ?></span> <span class="text-sm"><?= sanitize($e['full_name'] ?? '') ?></span>
+                            <?php foreach ($extensions as $e): $on = in_array($e['extension'], $members); ?>
+                            <label class="acl-ext<?= $on ? ' on' : '' ?>">
+                                <input type="checkbox" name="members[]" value="<?= sanitize($e['extension']) ?>" <?= $on ? 'checked' : '' ?>
+                                       onchange="this.parentNode.classList.toggle('on', this.checked)">
+                                <span class="mono font-bold"><?= sanitize($e['extension']) ?></span> <span class="text-sm"><?= sanitize($e['full_name'] ?? '') ?></span>
                             </label>
                             <?php endforeach; ?>
                         </div>
