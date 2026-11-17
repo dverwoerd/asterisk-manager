@@ -20,6 +20,9 @@ class YealinkProvisioning
         'America/Los_Angeles' => ['-8', 'United States-Pacific Time'],
     ];
 
+    // Aantal programmeerbare lijntoetsen voor modellen met weinig toetsen
+    private static array $modelLineKeys = ['T40G' => 3];
+
     private static array $keyTypes = [
         // Yealink SIP-T4x linekey type-nummers
         'conference' => 1,
@@ -347,7 +350,17 @@ class YealinkProvisioning
                 $configuredKeys[(int)$key['key_number']] = $key;
             }
 
-            $maxKey = max(array_keys($configuredKeys));
+            // Modellen met minder lijntoetsen (T40G: 3): toetsen daarboven overslaan
+            $modelKeys = self::$modelLineKeys[strtoupper($phone['model'] ?? '')] ?? null;
+            if ($modelKeys !== null) {
+                foreach ($configuredKeys as $kn => $_) {
+                    if ($kn > $modelKeys) {
+                        $cfg .= "## Toets " . $kn . " overgeslagen: " . $phone['model'] . " heeft maar " . $modelKeys . " lijntoetsen\n";
+                        unset($configuredKeys[$kn]);
+                    }
+                }
+            }
+            $maxKey = empty($configuredKeys) ? 0 : max(array_keys($configuredKeys));
             for ($k = 1; $k <= $maxKey; $k++) {
                 if (isset($configuredKeys[$k])) {
                     $key    = $configuredKeys[$k];
@@ -442,6 +455,7 @@ class YealinkProvisioning
             'T21E2'  => 'T21P E2',
             'T27G'   => 'T27G',
             'T30'    => 'T30',
+            'T40G'   => 'T40G (3 lijntoetsen)',
             'T41S'   => 'T41S',
             'T31G'   => 'T31G',
             'T33G'   => 'T33G',
