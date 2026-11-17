@@ -2,6 +2,12 @@
 // Zelfde opbouw als de PDF: samenvatting per categorie, detail per categorie
 // met gesprekken gegroepeerd per nummer.
 $t   = $spec['totaal'];
+$dur = function (int $sec): string {
+    $h = intdiv($sec, 3600); $m = intdiv($sec % 3600, 60); $x = $sec % 60;
+    if ($h > 0) return sprintf('%d u %02d min', $h, $m);
+    if ($m > 0) return sprintf('%d min %02d s', $m, $x);
+    return $x . ' s';
+};
 $eur = fn(float $v, int $d = 2) => '€ ' . number_format($v, $d, ',', '.');
 $catKleuren = [
     'Nationaal'      => '#1B3A6B',
@@ -45,7 +51,7 @@ $totE4 = (int)round($t['kosten'] * 10000);
         <div class="stat-label">Gesprekken</div>
     </div></div>
     <div class="stat-card"><div class="stat-body">
-        <div class="stat-value"><?= formatDuration($t['sec']) ?></div>
+        <div class="stat-value"><?= $dur($t['sec']) ?></div>
         <div class="stat-label">Totale duur</div>
     </div></div>
     <div class="stat-card"><div class="stat-body">
@@ -83,7 +89,7 @@ $totE4 = (int)round($t['kosten'] * 10000);
                         </span>
                     </td>
                     <td class="text-right mono"><?= $g['aantal'] ?></td>
-                    <td class="text-right mono"><?= formatDuration($g['sec']) ?></td>
+                    <td class="text-right mono"><?= $dur($g['sec']) ?></td>
                     <td class="text-right mono"><strong><?= $eur($g['kosten']) ?></strong></td>
                     <td class="text-right mono text-muted"><?= $totE4 > 0 ? number_format($g['e4'] / $totE4 * 100, 1, ',', '.') : '0' ?>%</td>
                 </tr>
@@ -93,7 +99,7 @@ $totE4 = (int)round($t['kosten'] * 10000);
                 <tr style="background:var(--bg-secondary);font-weight:600">
                     <td>Totaal</td>
                     <td class="text-right mono"><?= $t['aantal'] ?></td>
-                    <td class="text-right mono"><?= formatDuration($t['sec']) ?></td>
+                    <td class="text-right mono"><?= $dur($t['sec']) ?></td>
                     <td class="text-right mono" style="color:var(--accent)"><?= $eur($t['kosten']) ?></td>
                     <td class="text-right mono">100%</td>
                 </tr>
@@ -120,8 +126,7 @@ $totE4 = (int)round($t['kosten'] * 10000);
         <table class="data-table data-table-sm">
             <thead>
                 <tr>
-                    <th>Datum</th>
-                    <th>Tijd</th>
+                    <th>Datum en tijd</th>
                     <th>Toestel</th>
                     <th>Bestemming</th>
                     <th class="text-right">Duur</th>
@@ -131,7 +136,7 @@ $totE4 = (int)round($t['kosten'] * 10000);
             <tbody>
                 <?php foreach ($g['nummers'] as $n): ?>
                 <tr style="background:var(--bg-secondary);font-weight:600">
-                    <td colspan="4">
+                    <td colspan="3">
                         <span class="mono"><?= sanitize($n['nummer']) ?></span>
                         <span class="text-muted" style="font-weight:400;font-size:12px">
                             — <?= sanitize($n['land'] ?: $cat) ?> — <?= $n['aantal'] ?> gesprek<?= $n['aantal'] === 1 ? '' : 'ken' ?>
@@ -140,16 +145,15 @@ $totE4 = (int)round($t['kosten'] * 10000);
                         <span style="color:var(--warning);font-size:12px">⚠ geen tarief</span>
                         <?php endif; ?>
                     </td>
-                    <td class="text-right mono"><?= formatDuration($n['sec']) ?></td>
+                    <td class="text-right mono"><?= $dur($n['sec']) ?></td>
                     <td class="text-right mono"><?= $eur($n['kosten'], 4) ?></td>
                 </tr>
                 <?php foreach ($n['calls'] as $c): ?>
                 <tr>
-                    <td class="mono"><?= date('d-m-Y', strtotime($c['calldate'])) ?></td>
-                    <td class="mono"><?= date('H:i:s', strtotime($c['calldate'])) ?></td>
+                    <td class="mono" style="white-space:nowrap"><?= date('d-m-Y', strtotime($c['calldate'])) ?> &nbsp;<?= date('H:i', strtotime($c['calldate'])) ?> uur</td>
                     <td class="mono"><?= sanitize($c['src']) ?></td>
                     <td class="mono"><?= sanitize($c['dst']) ?></td>
-                    <td class="text-right mono"><?= formatDuration((int)$c['billsec']) ?></td>
+                    <td class="text-right mono"><?= $dur((int)$c['billsec']) ?></td>
                     <td class="text-right mono"><?= $eur($c['kosten'], 4) ?></td>
                 </tr>
                 <?php endforeach; ?>
@@ -157,8 +161,8 @@ $totE4 = (int)round($t['kosten'] * 10000);
             </tbody>
             <tfoot>
                 <tr style="background:var(--primary);color:#fff;font-weight:600">
-                    <td colspan="4">Subtotaal <?= sanitize($cat) ?></td>
-                    <td class="text-right mono"><?= formatDuration($g['sec']) ?></td>
+                    <td colspan="3">Subtotaal <?= sanitize($cat) ?></td>
+                    <td class="text-right mono"><?= $dur($g['sec']) ?></td>
                     <td class="text-right mono"><?= $eur($g['kosten']) ?></td>
                 </tr>
             </tfoot>
