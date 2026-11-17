@@ -85,13 +85,6 @@ try {
 
     logMsg("$count nieuwe records geimporteerd");
 
-    if ($count > 0) {
-        require_once APP_ROOT . '/controllers/BaseController.php';
-        require_once APP_ROOT . '/controllers/CDRController.php';
-        $costed = CDRController::applyRatesToCDR();
-        logMsg("Kosten berekend voor $costed records");
-    }
-
     $total = Database::fetchOne("SELECT COUNT(*) as cnt FROM cdr_records");
     logMsg("Totaal in database: " . ($total['cnt'] ?? 0) . " records");
 

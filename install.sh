@@ -246,8 +246,8 @@ require_once APP_ROOT . '/includes/AsteriskAMI.php';
 require_once APP_ROOT . '/controllers/CDRController.php';
 
 $cdr = new CDRController();
-CDRController::applyRatesToCDR();
-echo date('Y-m-d H:i:s') . " CDR costs applied\n";
+
+echo date('Y-m-d H:i:s') . " CDR sync done\n";
 CRONPHP
 
 chown www-data:www-data "$APP_DIR/cron/cdr_sync.php"

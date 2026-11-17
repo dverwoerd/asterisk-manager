@@ -58,9 +58,6 @@ return [
     'nav_outbound'     => 'Outbound Routes',
     'nav_trunks'       => 'Trunks',
     'nav_cdr'          => 'Call Records',
-    'nav_customers'    => 'Customers',
-    'nav_invoices'     => 'Invoices',
-    'nav_rate_plans'   => 'Rate Plans',
     'nav_settings'     => 'Settings',
 
     // Dashboard

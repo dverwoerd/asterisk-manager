@@ -36,8 +36,7 @@ class CDRController extends BaseController
         $summary = Database::fetchOne(
             "SELECT COUNT(*) as total_calls,
                     COALESCE(SUM(billsec), 0) as total_seconds,
-                    SUM(disposition='ANSWERED') as answered,
-                    COALESCE(SUM(cost), 0) as total_cost
+                    SUM(disposition='ANSWERED') as answered
              FROM cdr_records WHERE $whereStr",
             $params
         );
@@ -70,21 +69,13 @@ class CDRController extends BaseController
         redirect('?page=cdr');
     }
 
-    public function calculate_costs(): void
-    {
-        $this->requireOperator();
-        $count = self::applyRatesToCDR();
-        $this->flash('success', "Kosten berekend voor $count CDR records.");
-        redirect('?page=cdr');
-    }
-
     public function export(): void
     {
         $dateFrom = $this->get('date_from', date('Y-m-01'));
         $dateTo   = $this->get('date_to', date('Y-m-d'));
 
         $records = Database::fetchAll(
-            "SELECT calldate, src, dst, duration, billsec, disposition, cost, destination_name
+            "SELECT calldate, src, dst, duration, billsec, disposition
              FROM cdr_records
              WHERE calldate BETWEEN ? AND DATE_ADD(?, INTERVAL 1 DAY)
              ORDER BY calldate DESC",
@@ -96,7 +87,7 @@ class CDRController extends BaseController
 
         $out = fopen('php://output', 'w');
         fputs($out, "\xEF\xBB\xBF"); // BOM voor Excel
-        fputcsv($out, ['Date/Time', 'Source', 'Destination', 'Duration', 'Billable Sec', 'Disposition', 'Cost', 'Destination Name'], ';');
+        fputcsv($out, ['Date/Time', 'Source', 'Destination', 'Duration', 'Billable Sec', 'Disposition'], ';');
         foreach ($records as $r) {
             fputcsv($out, [
                 $r['calldate'],
@@ -105,8 +96,6 @@ class CDRController extends BaseController
                 formatDuration($r['duration']),
                 $r['billsec'],
                 $r['disposition'],
-                number_format((float)($r['cost'] ?? 0), 4, ',', '.'),
-                $r['destination_name'] ?? '',
             ], ';');
         }
         fclose($out);
@@ -181,7 +170,6 @@ class CDRController extends BaseController
             }
         }
 
-        if ($count > 0) self::applyRatesToCDR();
         return $count;
     }
 
@@ -240,69 +228,6 @@ class CDRController extends BaseController
         }
 
         fclose($handle);
-        if ($count > 0) self::applyRatesToCDR();
-        return $count;
-    }
-
-    public static function applyRatesToCDR(): int
-    {
-        // Alleen uitgaande gesprekken berekenen
-        // Interne nummers zijn max 3 cijfers (100-999), externe nummers zijn langer
-        $records = Database::fetchAll(
-            "SELECT * FROM cdr_records
-             WHERE cost IS NULL
-             AND disposition='ANSWERED'
-             AND billsec > 0
-             AND LENGTH(REGEXP_REPLACE(dst, '[^0-9]', '')) > 3
-             LIMIT 1000"
-        );
-
-        $ratePlans = Database::fetchAll("SELECT * FROM rate_plans WHERE active=1");
-        $count     = 0;
-
-        foreach ($records as $cdr) {
-            $dst      = preg_replace('/\D/', '', $cdr['dst']);
-            $bestRate = null;
-            $bestLen  = -1;
-            $planId   = null;
-            $destName = null;
-
-            foreach ($ratePlans as $plan) {
-                $rates = Database::fetchAll(
-                    "SELECT * FROM rate_plan_rates WHERE plan_id=? ORDER BY LENGTH(prefix) DESC",
-                    [$plan['id']]
-                );
-                foreach ($rates as $rate) {
-                    $prefix = $rate['prefix'];
-                    if ($prefix === '' || str_starts_with($dst, $prefix)) {
-                        $len = strlen($prefix);
-                        if ($len > $bestLen) {
-                            $bestLen  = $len;
-                            $bestRate = $rate;
-                            $planId   = $plan['id'];
-                            $destName = $rate['destination_name'];
-                        }
-                    }
-                }
-            }
-
-            if ($bestRate) {
-                $increment = max(1, (int)($bestRate['billing_increment'] ?? 60));
-                $billsec   = max((int)$cdr['billsec'], $increment);
-                $minutes   = ceil($billsec / $increment) * ($increment / 60);
-                $cost      = ($minutes * (float)$bestRate['rate_per_minute'])
-                           + (float)($bestRate['connection_fee'] ?? 0);
-
-                Database::update('cdr_records', [
-                    'rate_plan_id'     => $planId,
-                    'rate_applied'     => $bestRate['rate_per_minute'],
-                    'cost'             => round($cost, 4),
-                    'destination_name' => $destName,
-                ], 'id=?', [$cdr['id']]);
-                $count++;
-            }
-        }
-
         return $count;
     }
 }

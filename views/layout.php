@@ -62,21 +62,9 @@
             <span class="nav-icon">⌥</span><span class="nav-label"><?= t('nav_dialplan') ?></span>
         </a>
 
-        <div class="nav-section-label">BILLING</div>
+        <div class="nav-section-label">GESPREKKEN</div>
         <a href="?page=cdr" class="nav-item<?= activeNav('cdr') ?>">
             <span class="nav-icon">▤</span><span class="nav-label"><?= t('nav_cdr') ?></span>
-        </a>
-        <a href="?page=customers" class="nav-item<?= activeNav('customers') ?>">
-            <span class="nav-icon">⊙</span><span class="nav-label"><?= t('nav_customers') ?></span>
-        </a>
-        <a href="?page=invoices" class="nav-item<?= activeNav('invoices') ?>">
-            <span class="nav-icon">▣</span><span class="nav-label"><?= t('nav_invoices') ?></span>
-        </a>
-        <a href="?page=rate_plans" class="nav-item<?= activeNav('rate_plans') ?>">
-            <span class="nav-icon">€</span><span class="nav-label"><?= t('nav_rate_plans') ?></span>
-        </a>
-        <a href="?page=gesprekspecificaties" class="nav-item<?= activeNav('gesprekspecificaties') ?>">
-            <span class="nav-icon">📞</span><span class="nav-label"><?= t('nav_gesprekspecificaties') ?></span>
         </a>
 
         <div class="nav-section-label">PROVISIONING</div>

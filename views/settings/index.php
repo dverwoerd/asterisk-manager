@@ -6,7 +6,6 @@
     <div class="tab-bar">
         <button class="tab-item active" onclick="showTab('company')">Company</button>
         <button class="tab-item" onclick="showTab('asterisk')">Asterisk</button>
-        <button class="tab-item" onclick="showTab('invoicing')">Invoicing</button>
         <button class="tab-item" onclick="showTab('users')">Users</button>
         <button class="tab-item" onclick="showTab('provisioning')">Provisioning</button>
         <button class="tab-item" onclick="showTab('system')">System</button>
@@ -107,33 +106,6 @@
                             <label>CDR Sync Interval (seconds)</label>
                             <input type="number" name="cdr_sync_interval" class="form-control" value="<?= (int)($settings['cdr_sync_interval']??300) ?>">
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Invoicing Tab -->
-        <div class="tab-pane" id="tab-invoicing" style="display:none">
-            <div class="card">
-                <div class="card-header"><h3 class="card-title"><?= t('invoice_settings') ?></h3></div>
-                <div class="card-body">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Invoice Number Prefix</label>
-                            <input type="text" name="invoice_prefix" class="form-control mono" value="<?= sanitize($settings['invoice_prefix'] ?? 'INV-') ?>">
-                        </div>
-                        <div class="form-group">
-                            <label>Default VAT Rate (%)</label>
-                            <input type="number" name="default_tax_rate" class="form-control" value="<?= (int)($settings['default_tax_rate']??21) ?>" step="0.5">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Default Currency</label>
-                        <select name="default_currency" class="form-control">
-                            <?php foreach (['EUR'=>'Euro (€)','USD'=>'US Dollar ($)','GBP'=>'Pound (£)'] as $code => $name): ?>
-                            <option value="<?= $code ?>" <?= ($settings['default_currency']??'EUR')===$code?'selected':'' ?>><?= $name ?></option>
-                            <?php endforeach; ?>
-                        </select>
                     </div>
                 </div>
             </div>

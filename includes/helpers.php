@@ -120,14 +120,6 @@ function sanitize(string $input): string
     return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
 }
 
-function generateInvoiceNumber(): string
-{
-    $prefix = getSetting('invoice_prefix', 'INV-');
-    $next = (int) getSetting('invoice_next_number', 1001);
-    Database::setSetting('invoice_next_number', $next + 1);
-    return $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
-}
-
 function asteriskReload(?string $module = null): bool
 {
     try {

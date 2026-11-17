@@ -54,14 +54,7 @@ return [
     'nav_outbound'     => 'Uitgaande routes',
     'nav_trunks'       => 'Trunks',
     'nav_cdr'                     => 'Gespreksregistraties',
-    'nav_customers'               => 'Klanten',
-    'nav_invoices'                => 'Facturen',
-    'nav_rate_plans'              => 'Tariefplannen',
-    'nav_gesprekspecificaties'    => 'Gespreksspecificaties',
     'nav_settings'                => 'Instellingen',
-
-    'gesprekspecificaties'        => 'Gespreksspecificaties',
-    'gesprekspecificaties_detail' => 'Gespreksspecificatie detail',
 
     'dashboard_title'       => 'Dashboard',
     'active_channels'       => 'Actieve kanalen',

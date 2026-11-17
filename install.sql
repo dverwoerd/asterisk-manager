@@ -230,104 +230,6 @@ CREATE TABLE dialplan_entries (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- RATE PLANS & RATES
--- ============================================================
-CREATE TABLE rate_plans (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(128) NOT NULL,
-    description TEXT,
-    currency VARCHAR(8) DEFAULT 'EUR',
-    billing_increment INT DEFAULT 60,
-    minimum_duration INT DEFAULT 0,
-    connection_fee DECIMAL(10,4) DEFAULT 0.0000,
-    active TINYINT(1) DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
-CREATE TABLE rate_plan_rates (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    plan_id INT NOT NULL,
-    destination_name VARCHAR(128) NOT NULL,
-    prefix VARCHAR(32) NOT NULL,
-    rate_per_minute DECIMAL(10,4) NOT NULL,
-    connection_fee DECIMAL(10,4) DEFAULT 0.0000,
-    billing_increment INT DEFAULT 60,
-    time_start TIME DEFAULT '00:00:00',
-    time_end TIME DEFAULT '23:59:59',
-    days_of_week VARCHAR(32) DEFAULT '1234567',
-    notes VARCHAR(255),
-    FOREIGN KEY (plan_id) REFERENCES rate_plans(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- Default rate plan
-INSERT INTO rate_plans (name, description, currency) VALUES
-('Standard', 'Default rate plan', 'EUR');
-
-INSERT INTO rate_plan_rates (plan_id, destination_name, prefix, rate_per_minute) VALUES
-(1, 'Netherlands - National', '31', 0.0200),
-(1, 'Netherlands - Mobile', '316', 0.1500),
-(1, 'Europe - Fixed', '3', 0.0300),
-(1, 'USA & Canada', '1', 0.0150),
-(1, 'International', '', 0.2500);
-
--- ============================================================
--- CUSTOMERS (for invoicing)
--- ============================================================
-CREATE TABLE customers (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    company_name VARCHAR(128),
-    contact_name VARCHAR(128) NOT NULL,
-    email VARCHAR(128),
-    phone VARCHAR(32),
-    address TEXT,
-    city VARCHAR(64),
-    postal_code VARCHAR(16),
-    country VARCHAR(64) DEFAULT 'Netherlands',
-    vat_number VARCHAR(32),
-    rate_plan_id INT DEFAULT 1,
-    extensions_csv VARCHAR(512) COMMENT 'Comma-separated list of assigned extensions',
-    notes TEXT,
-    active TINYINT(1) DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (rate_plan_id) REFERENCES rate_plans(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- ============================================================
--- INVOICES
--- ============================================================
-CREATE TABLE invoices (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    invoice_number VARCHAR(32) NOT NULL UNIQUE,
-    customer_id INT,
-    period_start DATE NOT NULL,
-    period_end DATE NOT NULL,
-    issue_date DATE DEFAULT (CURRENT_DATE),
-    due_date DATE,
-    subtotal DECIMAL(12,2) DEFAULT 0.00,
-    tax_rate DECIMAL(5,2) DEFAULT 21.00,
-    tax_amount DECIMAL(12,2) DEFAULT 0.00,
-    total DECIMAL(12,2) DEFAULT 0.00,
-    currency VARCHAR(8) DEFAULT 'EUR',
-    status ENUM('draft','sent','paid','overdue','cancelled') DEFAULT 'draft',
-    notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
-CREATE TABLE invoice_items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    invoice_id INT NOT NULL,
-    description VARCHAR(255) NOT NULL,
-    quantity DECIMAL(10,2) DEFAULT 1.00,
-    unit VARCHAR(32) DEFAULT 'minutes',
-    unit_price DECIMAL(10,4) NOT NULL,
-    total DECIMAL(12,2) NOT NULL,
-    cdr_ids TEXT COMMENT 'JSON array of CDR IDs included',
-    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- ============================================================
 -- CDR MIRROR (synced from Asterisk cdr MySQL table)
 -- ============================================================
 CREATE TABLE cdr_records (
@@ -348,16 +250,9 @@ CREATE TABLE cdr_records (
     accountcode VARCHAR(20),
     uniqueid VARCHAR(32),
     userfield VARCHAR(255),
-    rate_plan_id INT DEFAULT NULL,
-    rate_applied DECIMAL(10,4) DEFAULT NULL,
-    cost DECIMAL(10,4) DEFAULT NULL,
-    destination_name VARCHAR(128),
-    invoiced TINYINT(1) DEFAULT 0,
-    invoice_id INT DEFAULT NULL,
     INDEX idx_calldate (calldate),
     INDEX idx_src (src),
     INDEX idx_dst (dst),
-    INDEX idx_invoiced (invoiced),
     UNIQUE KEY unique_call (uniqueid)
 ) ENGINE=InnoDB;
 
@@ -378,8 +273,6 @@ INSERT INTO settings (setting_key, setting_value, setting_type, description) VAL
 ('company_vat', '', 'string', 'Company VAT number'),
 ('company_email', '', 'string', 'Company email'),
 ('company_phone', '', 'string', 'Company phone'),
-('invoice_prefix', 'INV-', 'string', 'Invoice number prefix'),
-('invoice_next_number', '1001', 'integer', 'Next invoice number'),
 ('default_tax_rate', '21', 'integer', 'Default VAT/tax rate percentage'),
 ('default_currency', 'EUR', 'string', 'Default currency code'),
 ('asterisk_host', '127.0.0.1', 'string', 'Asterisk server host'),

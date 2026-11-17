@@ -2,7 +2,6 @@
     <h1 class="page-title"><?= t('cdr') ?></h1>
     <div class="page-actions">
         <a href="?page=cdr&action=sync" class="btn btn-ghost">⟳ <?= t('sync_cdr') ?></a>
-        <a href="?page=cdr&action=calculate_costs" class="btn btn-ghost">€ Calculate Costs</a>
         <a href="?page=cdr&action=export&<?= http_build_query($filters) ?>" class="btn btn-ghost">↓ <?= t('export') ?> CSV</a>
     </div>
 </div>
@@ -68,12 +67,6 @@
             <div class="stat-label">Answered</div>
         </div>
     </div>
-    <div class="stat-card stat-accent">
-        <div class="stat-body">
-            <div class="stat-value mono">€ <?= number_format($summary['total_cost'] ?? 0, 2, ',', '.') ?></div>
-            <div class="stat-label">Total Cost</div>
-        </div>
-    </div>
 </div>
 <?php endif; ?>
 
@@ -92,12 +85,9 @@
                     <th><?= t('calldate') ?></th>
                     <th><?= t('src') ?></th>
                     <th><?= t('dst') ?></th>
-                    <th>Destination</th>
                     <th><?= t('duration') ?></th>
                     <th>Bill.</th>
                     <th><?= t('disposition') ?></th>
-                    <th><?= t('cost') ?></th>
-                    <th>Inv.</th>
                 </tr>
             </thead>
             <tbody>
@@ -106,23 +96,12 @@
                 <td class="mono text-sm"><?= substr($r['calldate'],0,16) ?></td>
                 <td class="mono"><?= sanitize($r['src']) ?></td>
                 <td class="mono"><?= sanitize($r['dst']) ?></td>
-                <td class="text-sm text-muted"><?= sanitize($r['destination_name'] ?? '') ?></td>
                 <td class="mono"><?= formatDuration($r['duration']) ?></td>
                 <td class="mono"><?= $r['billsec'] ?>s</td>
                 <td>
                     <span class="badge badge-<?= match($r['disposition']) {
                         'ANSWERED'=>'success','BUSY'=>'warning',default=>'danger'
                     } ?>"><?= $r['disposition'] ?></span>
-                </td>
-                <td class="mono">
-                    <?= $r['cost'] !== null ? '€ '.number_format((float)($r['cost']), 4,',','.') : '<span class="text-muted">—</span>' ?>
-                </td>
-                <td>
-                    <?php if ($r['invoiced']): ?>
-                    <a href="?page=invoices&action=view&id=<?= $r['invoice_id'] ?>" class="badge badge-success">✓</a>
-                    <?php else: ?>
-                    <span class="badge badge-default">—</span>
-                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>

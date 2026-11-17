@@ -45,7 +45,6 @@ class SettingsController extends BaseController
         $this->requireAdmin();
         $keys = [
             'company_name','company_address','company_vat','company_email','company_phone',
-            'invoice_prefix','default_tax_rate','default_currency',
             'asterisk_host','asterisk_ami_port','asterisk_ami_user','asterisk_ami_secret','asterisk_config_path',
             'asterisk_external_host','asterisk_local_nets',
             'provision_base_url','provision_admin_pass','provision_ntp_server','provision_timezone','provision_tftp_path',

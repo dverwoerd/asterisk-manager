@@ -117,10 +117,3 @@ fclose($handle);
 
 logMsg("Import klaar: $count nieuw, $skipped overgeslagen, $errors fouten");
 
-// Bereken kosten voor nieuwe records
-if ($count > 0) {
-    logMsg("Kosten berekenen voor nieuwe records...");
-    require_once APP_ROOT . '/controllers/CDRController.php';
-    $costed = CDRController::applyRatesToCDR();
-    logMsg("Kosten berekend voor $costed records");
-}
