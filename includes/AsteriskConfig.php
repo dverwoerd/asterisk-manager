@@ -597,6 +597,10 @@ class AsteriskConfig
         $out .= ' same => n,VoiceMailMain(${CALLERID(num)}@default)' . "\n";
         $out .= " same => n,Hangup()\n\n";
 
+        // Eigen nummers (inbound DID's): bel je die vanaf een toestel, dan niet via de provider
+        // heen en weer sturen (geeft bij Voicedeals een 480), maar direct intern afhandelen.
+        $out .= $this->generateOwnDidShortcuts();
+
         // Uitgaande routes
         foreach ($outboundRoutes as $route) {
             $patterns = Database::fetchAll(
@@ -695,6 +699,37 @@ class AsteriskConfig
         foreach ($acl['restricted'] as $e) $out .= 'exten => ' . $e . ",1,NoOp()\n";
         $out .= "\n[acl-allow]\n";
         foreach ($acl['pairs'] as $p) $out .= 'exten => ' . $p . ",1,NoOp()\n";
+        return $out . "\n";
+    }
+
+    /**
+     * Exacte extensies in from-internal voor elk eigen nummer, in alle gangbare schrijfwijzen,
+     * die direct naar de inbound-route springen. Exacte matches winnen altijd van de patronen
+     * van de uitgaande routes.
+     */
+    private function generateOwnDidShortcuts(): string
+    {
+        $routes = Database::fetchAll("SELECT did FROM inbound_routes WHERE enabled=1 AND did<>''");
+        $out = "; --- Eigen nummers: intern afhandelen ---\n";
+        $seen = [];
+        foreach ($routes as $r) {
+            $stored = (string)$r['did'];                                      // zo staat de route in from-trunk
+            if (!ctype_digit($stored) || strlen($stored) < 9) continue;      // geen patronen, 's' of korte nummers
+            $did = $stored;
+            $variants = [$did];
+            if (str_starts_with($did, '31')) {
+                $nat = '0' . substr($did, 2);
+                $variants = [$did, $nat, '+' . $did, '00' . $did];
+            } elseif (str_starts_with($did, '0') && !str_starts_with($did, '00')) {
+                $variants = [$did, '31' . substr($did, 1), '+31' . substr($did, 1), '0031' . substr($did, 1)];
+            }
+            foreach ($variants as $v) {
+                if (isset($seen[$v])) continue;
+                $seen[$v] = true;
+                $out .= 'exten => ' . $v . ",1,NoOp(Eigen nummer " . $v . ": intern doorgezet)\n";
+                $out .= ' same => n,Goto(from-trunk,' . $stored . ",1)\n";
+            }
+        }
         return $out . "\n";
     }
 
