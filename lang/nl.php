@@ -48,6 +48,7 @@ return [
     'nav_extensions'   => 'Toestelnummers',
     'nav_queues'       => 'Wachtrijen',
     'nav_ring_groups'  => 'Belgroepen',
+    'nav_call_acl'     => 'Bel-rechten',
     'nav_dialplan'     => 'Kiesplan',
     'nav_inbound'      => 'Inkomende routes',
     'nav_outbound'     => 'Uitgaande routes',

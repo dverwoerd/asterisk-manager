@@ -52,6 +52,7 @@ $routes = [
     'extensions'      => 'ExtensionsController',
     'queues'          => 'QueuesController',
     'ring_groups'     => 'RingGroupsController',
+    'call_acl'        => 'CallAclController',
     'dialplan'        => 'DialplanController',
     'inbound_routes'  => 'InboundRoutesController',
     'outbound_routes' => 'OutboundRoutesController',

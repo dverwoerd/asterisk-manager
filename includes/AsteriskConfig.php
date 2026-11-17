@@ -473,6 +473,7 @@ class AsteriskConfig
         $out  = $this->header('Extensions (Dialplan)');
         $out .= $this->generateFromInternal();
         $out .= $this->generateFromTrunk();
+        $out .= $this->generateAclContexts();
         $out .= $this->generateAiVoice();
         $out .= "[from-internal-custom]\n; Add custom rules here\n\n";
         $out .= "[from-trunk-custom]\n; Add custom rules here\n\n";
@@ -486,6 +487,8 @@ class AsteriskConfig
         $ringGroups     = Database::fetchAll("SELECT * FROM ring_groups WHERE enabled=1");
         $queues         = Database::fetchAll("SELECT * FROM queues WHERE enabled=1");
         $outboundRoutes = Database::fetchAll("SELECT * FROM outbound_routes WHERE enabled=1 ORDER BY priority DESC");
+
+        $aclActive = $this->loadAcl() !== null;
 
         $out  = "[from-internal]\n";
         $out .= "include => from-internal-custom\n\n";
@@ -502,6 +505,7 @@ class AsteriskConfig
             $ringTime = (int)($ext['ring_time'] ?? 20);
 
             $out .= 'exten => ' . $exten . ",1,NoOp(Call to extension " . $exten . ")\n";
+            $out .= $this->aclCheckLines($exten, $aclActive);
             $out .= ' same => n,GotoIf($["${FROM_DID}" = "1"]?skipcid' . $exten . ')' . "\n";
             $out .= ' same => n,Set(CALLERID(name)=' . $cidName . ")\n";
             $out .= ' same => n(skipcid' . $exten . '),NoOp()' . "\n";
@@ -629,6 +633,69 @@ class AsteriskConfig
         }
 
         return $out;
+    }
+
+    /**
+     * Bel-rechten (ACL). Toestellen die lid zijn van minstens een actieve groep
+     * zijn "beperkt": ze mogen alleen bellen met of gebeld worden door toestellen
+     * waarmee ze een groep delen (of die als "ook toegestaan" bij hun groep staan).
+     * Niet-aangesloten toestellen blijven onbeperkt. Alleen toestel-naar-toestel
+     * verkeer van een toestel (CHANNEL(endpoint)) wordt gecontroleerd; inkomende
+     * gesprekken via een trunk (FROM_DID) en doorschakelingen niet.
+     * @return array{restricted: string[], pairs: string[]}|null
+     */
+    private function loadAcl(): ?array
+    {
+        try {
+            $groups = Database::fetchAll("SELECT * FROM call_acl_groups WHERE enabled=1");
+        } catch (Exception $e) {
+            return null; // tabel bestaat nog niet (migrate_acl.sql niet uitgevoerd)
+        }
+        if (empty($groups)) return null;
+
+        $restricted = [];
+        $pairs      = [];
+        foreach ($groups as $g) {
+            $members = array_column(Database::fetchAll(
+                "SELECT extension FROM call_acl_members WHERE group_id=?", [$g['id']]), 'extension');
+            $extras = array_filter(array_map('trim', explode(',', (string)$g['allowed_extras'])), 'strlen');
+            foreach ($members as $a) {
+                $restricted[$a] = true;
+                foreach ($members as $b) if ($a !== $b) $pairs[$a . '-' . $b] = true;
+                foreach ($extras as $x) {
+                    if ($x === $a) continue;
+                    $pairs[$a . '-' . $x] = true;
+                    $pairs[$x . '-' . $a] = true;
+                }
+            }
+        }
+        if (empty($restricted)) return null;
+        return ['restricted' => array_keys($restricted), 'pairs' => array_keys($pairs)];
+    }
+
+    private function aclCheckLines(string $exten, bool $active): string
+    {
+        if (!$active) return '';
+        $ok = 'aclok' . $exten;
+        $o  = ' same => n,GotoIf($["${FROM_DID}" = "1"]?' . $ok . ")\n";
+        $o .= ' same => n,GotoIf($["${CHANNEL(endpoint)}" = ""]?' . $ok . ")\n";
+        $o .= ' same => n,GotoIf($[${DIALPLAN_EXISTS(acl-restricted,${CHANNEL(endpoint)},1)} + ${DIALPLAN_EXISTS(acl-restricted,' . $exten . ',1)} = 0]?' . $ok . ")\n";
+        $o .= ' same => n,GotoIf($[${DIALPLAN_EXISTS(acl-allow,${CHANNEL(endpoint)}-' . $exten . ',1)} = 1]?' . $ok . ")\n";
+        $o .= ' same => n,NoOp(ACL: ${CHANNEL(endpoint)} mag ' . $exten . " niet bellen)\n";
+        $o .= " same => n,Hangup(21)\n";
+        $o .= ' same => n(' . $ok . "),NoOp()\n";
+        return $o;
+    }
+
+    private function generateAclContexts(): string
+    {
+        $acl = $this->loadAcl();
+        if ($acl === null) return '';
+        $out  = "[acl-restricted]\n";
+        foreach ($acl['restricted'] as $e) $out .= 'exten => ' . $e . ",1,NoOp()\n";
+        $out .= "\n[acl-allow]\n";
+        foreach ($acl['pairs'] as $p) $out .= 'exten => ' . $p . ",1,NoOp()\n";
+        return $out . "\n";
     }
 
     private function generateFromTrunk(): string
