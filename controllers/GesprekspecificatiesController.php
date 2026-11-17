@@ -100,6 +100,7 @@ class GesprekspecificatiesController extends BaseController
             'maand'      => $maand,
             'maandLabel' => $this->maandNaam($mnr) . ' ' . $jaar,
             'spec'       => $spec,
+            'dubbelen'   => $this->dubbelen,
             'tarieven'   => $this->tariefInstellingen(),
         ]);
     }
@@ -354,6 +355,37 @@ class GesprekspecificatiesController extends BaseController
         return array_unique(array_values(array_filter(array_merge($exts, $extra))));
     }
 
+    /** Aantal gesprekken dat als dubbel is weggelaten bij de laatste fetchCalls (voor de melding op het scherm). */
+    private int $dubbelen = 0;
+
+    /**
+     * Zelfde toestel, zelfde (genormaliseerde) bestemming, starttijd binnen 5 s en duur binnen 5 s:
+     * dan is het hetzelfde gesprek uit twee bronnen. De langste duur blijft staan.
+     */
+    private function ontdubbel(array $rows): array
+    {
+        usort($rows, fn($a, $b) => strcmp($a['calldate'], $b['calldate']));
+        $kept = [];
+        $laatste = [];                     // sleutel => index in $kept
+        $this->dubbelen = 0;
+        foreach ($rows as $r) {
+            $key = $r['src'] . '|' . self::normaliseerNummer($r['dst']);
+            $ts  = strtotime($r['calldate']);
+            if (isset($laatste[$key])) {
+                $i = $laatste[$key];
+                if (abs($ts - strtotime($kept[$i]['calldate'])) <= 5
+                    && abs((int)$r['billsec'] - (int)$kept[$i]['billsec']) <= 5) {
+                    if ((int)$r['billsec'] > (int)$kept[$i]['billsec']) $kept[$i] = $r;
+                    $this->dubbelen++;
+                    continue;
+                }
+            }
+            $kept[] = $r;
+            $laatste[$key] = count($kept) - 1;
+        }
+        return $kept;
+    }
+
     private function fetchCalls(array $customer, string $dateFrom, string $dateTo): array
     {
         $exts = $this->extensiesVanKlant($customer);
@@ -372,6 +404,10 @@ class GesprekspecificatiesController extends BaseController
             [...$exts, $dateFrom, $dateTo]
         );
 
+        // Asterisk-CDR en geimporteerde CSV-records staan in dezelfde tabel. Overlappen ze (zelfde toestel,
+        // nummer en starttijd), dan telt dat gesprek maar een keer.
+        $rows = $this->ontdubbel($rows);
+
         $inst     = $this->tariefInstellingen();
         $tarieven = self::laadTarieven();
         foreach ($rows as &$r) {
@@ -385,6 +421,15 @@ class GesprekspecificatiesController extends BaseController
     // ================================================================
     // Nummers
     // ================================================================
+
+    /** Leesbare gespreksduur ("9 min 27 s"), zodat die niet op een kloktijd lijkt. Gedeeld door scherm en PDF. */
+    public static function leesbareDuur(int $sec): string
+    {
+        $h = intdiv($sec, 3600); $m = intdiv($sec % 3600, 60); $x = $sec % 60;
+        if ($h > 0) return sprintf('%d u %02d min', $h, $m);
+        if ($m > 0) return sprintf('%d min %02d s', $m, $x);
+        return $x . ' s';
+    }
 
     /** Internationaal formaat zonder + of 00 (0612.., +31612.., 0031612.. -> 31612..). */
     public static function normaliseerNummer(string $dst): string

@@ -11,6 +11,8 @@
 // Pantronic huisstijl: blauw #1B3A6B, oranje #F37021
 // ============================================================
 
+require_once APP_ROOT . '/controllers/GesprekspecificatiesController.php';
+
 class GesprekPDF
 {
     const BLAUW      = '#1B3A6B';
@@ -97,8 +99,9 @@ class GesprekPDF
         .groot td { font-size: 10pt; padding: 14.2pt 13.6pt 14.2pt 14pt; }
 
         .spec th { font-size: 9pt; padding: 8pt 9pt; }
-        .spec td { font-size: 9pt; padding: 6pt 9pt; }
-        .spec tr.cat td { background: #D3DBEA; color: $blauw; font-weight: bold; padding: 7pt 9pt; }
+        .spec td { font-size: 8.5pt; padding: 3.5pt 9pt; }
+        .spec tr.cat td { background: #D3DBEA; color: $blauw; font-weight: bold; padding: 7pt 9pt; border-top: 1pt solid $blauw; }
+        .spec tr.nr td { background: #F1F4F9; color: $blauw; font-weight: bold; padding: 5pt 9pt; border-top: 0.5pt solid $rand; }
         .spec tr.totaal td { padding: 7pt 9pt; }
         .pagina2 { color: $blauw; font-size: 11pt; font-weight: bold; margin: 0 0 3pt; }
         ";
@@ -126,31 +129,32 @@ class GesprekPDF
             </tbody>
         </table>';
 
-        // ---- Specificatie per nummer, gegroepeerd op categorie (pagina 2) ----
+        // ---- Pagina 2: per categorie, per nummer, de afzonderlijke gesprekken ----
+        $dur = fn(int $sec) => GesprekspecificatiesController::leesbareDuur($sec);
         $rijen = '';
-        $huidig = null;
-        $i = 0;
-        foreach ($spec['nummers'] as $n) {
-            if ($n['categorie'] !== $huidig) {
-                $huidig = $n['categorie'];
-                $g = $spec['categorieen'][$huidig];
-                $rijen .= '<tr class="cat"><td colspan="2" class="lnk">' . htmlspecialchars($huidig) . '</td>'
-                    . '<td class="c">' . (int)$g['aantal'] . '</td><td class="c">' . (int)$g['minuten'] . '</td>'
-                    . '<td class="r">' . self::euro($g['kosten']) . '</td></tr>';
-                $i = 0;
-            }
-            $ts = $n['toestellen'] ?? [];
-            $toestel = $ts ? (count($ts) > 1 ? 'Toestellen ' : 'Toestel ') . htmlspecialchars(implode(', ', $ts)) : '';
+        foreach ($spec['categorieen'] as $cat => $g) {
+            if ($g['aantal'] === 0) continue;
+            $rijen .= '<tr class="cat"><td colspan="2" class="lnk">' . htmlspecialchars($cat) . '</td>'
+                . '<td class="c">' . $dur((int)$g['sec']) . '</td><td class="c">' . (int)$g['minuten'] . '</td>'
+                . '<td class="r">' . self::euro($g['kosten']) . '</td></tr>';
 
-            $rijen .= '<tr' . ($i++ % 2 ? ' class="alt"' : '') . '>'
-                . '<td class="lnk">' . htmlspecialchars($n['nummer']) . '</td>'
-                . '<td class="lnk">' . (!empty($n['land'])
-                        ? htmlspecialchars($n['land']) . ($toestel ? '<br><span class="klein">' . $toestel . '</span>' : '')
-                        : '<span class="klein">' . $toestel . '</span>') . '</td>'
-                . '<td class="c">' . (int)$n['aantal'] . '</td>'
-                . '<td class="c">' . (int)$n['minuten'] . '</td>'
-                . '<td class="r">' . self::euro($n['kosten']) . '</td>'
-                . '</tr>';
+            foreach ($g['nummers'] as $n) {
+                $omschr = !empty($n['land']) ? ' &middot; ' . htmlspecialchars($n['land']) : '';
+                if (isset($n['tarief_bekend']) && !$n['tarief_bekend']) $omschr .= ' &middot; geen tarief';
+                $rijen .= '<tr class="nr"><td colspan="2" class="lnk">' . htmlspecialchars($n['nummer']) . $omschr . '</td>'
+                    . '<td class="c">' . $dur((int)$n['sec']) . '</td><td class="c">' . (int)$n['minuten'] . '</td>'
+                    . '<td class="r">' . self::euro4($n['kosten']) . '</td></tr>';
+                $j = 0;
+                foreach ($n['calls'] as $c) {
+                    $rijen .= '<tr' . ($j++ % 2 ? ' class="alt"' : '') . '>'
+                        . '<td class="lnk">' . date('d-m-Y H:i', strtotime($c['calldate'])) . '</td>'
+                        . '<td class="lnk">Toestel ' . htmlspecialchars($c['src']) . '</td>'
+                        . '<td class="c">' . $dur((int)$c['billsec']) . '</td>'
+                        . '<td class="c">' . (int)$c['minuten'] . '</td>'
+                        . '<td class="r">' . self::euro4($c['kosten']) . '</td>'
+                        . '</tr>';
+                }
+            }
         }
         if ($rijen === '') {
             $rijen = '<tr><td colspan="5" class="c klein">Geen gesprekken in deze periode.</td></tr>';
@@ -158,13 +162,13 @@ class GesprekPDF
         $perNummer = '
         <table class="tbl spec">
             <thead><tr>
-                <th style="width:101.7pt">Nummer</th><th style="width:222pt">Bestemming</th>
-                <th style="width:55pt">Aantal</th><th style="width:58.4pt">Minuten</th>
-                <th style="width:79pt">Totaal (&euro;)</th>
+                <th style="width:120pt" class="lnk">Datum en tijd</th><th style="width:130pt" class="lnk">Toestel / nummer</th>
+                <th style="width:95pt">Duur</th><th style="width:60pt">Minuten</th>
+                <th style="width:110pt">Kosten (&euro;)</th>
             </tr></thead>
             <tbody>' . $rijen . '
-                <tr class="totaal"><td class="lnk">Totaal</td><td></td>
-                    <td class="c">' . (int)$t['aantal'] . '</td><td class="c">' . (int)$t['minuten'] . '</td>
+                <tr class="totaal"><td class="lnk" colspan="2">Totaal</td>
+                    <td class="c">' . $dur((int)$t['sec']) . '</td><td class="c">' . (int)$t['minuten'] . '</td>
                     <td class="r">' . self::euro($t['kosten']) . '</td></tr>
             </tbody>
         </table>';
@@ -185,10 +189,15 @@ class GesprekPDF
 
 <div class="inhoud">
     <div class="pagina2">Specificatie per nummer</div>
-    <div class="klein" style="margin-bottom:10px">' . $klant . ' &middot; ' . htmlspecialchars($maandLabel) . ' &middot; gesorteerd op categorie</div>
+    <div class="klein" style="margin-bottom:10px">' . $klant . ' &middot; ' . htmlspecialchars($maandLabel) . ' &middot; per categorie en nummer</div>
     ' . $perNummer . '
 </div>
 </body></html>';
+    }
+
+    private static function euro4(float $v): string
+    {
+        return '&euro; ' . number_format($v, 4, ',', '.');
     }
 
     private static function euro(float $v): string
