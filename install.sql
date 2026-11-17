@@ -230,6 +230,26 @@ CREATE TABLE dialplan_entries (
 ) ENGINE=InnoDB;
 
 -- ============================================================
+-- KLANTEN (gespreksspecificaties)
+-- ============================================================
+CREATE TABLE customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    company_name VARCHAR(128),
+    contact_name VARCHAR(128) NOT NULL,
+    email VARCHAR(128),
+    phone VARCHAR(32),
+    address TEXT,
+    city VARCHAR(64),
+    postal_code VARCHAR(16),
+    country VARCHAR(64) DEFAULT 'Nederland',
+    vat_number VARCHAR(32),
+    extensions_csv VARCHAR(512) COMMENT 'Komma-gescheiden toestelnummers van deze klant',
+    notes TEXT,
+    active TINYINT(1) DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ============================================================
 -- CDR MIRROR (synced from Asterisk cdr MySQL table)
 -- ============================================================
 CREATE TABLE cdr_records (

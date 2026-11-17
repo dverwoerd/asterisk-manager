@@ -6,6 +6,19 @@
     </div>
 </div>
 
+<!-- CSV importeren -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="POST" action="?page=cdr&action=post_upload" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <?= csrf() ?>
+            <strong>CDR importeren (CSV)</strong>
+            <input type="file" name="cdr_csv" accept=".csv,.txt" class="form-control" style="max-width:320px" required>
+            <button type="submit" class="btn btn-accent">Importeren</button>
+            <small class="form-hint" style="margin:0">Kopregel met kolommen (datum, src, dst, billsec, ...) of Asterisk Master.csv. Dubbele regels worden overgeslagen.</small>
+        </form>
+    </div>
+</div>
+
 <!-- Filters -->
 <div class="card mb-4">
     <div class="card-body">

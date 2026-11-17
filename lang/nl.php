@@ -54,6 +54,9 @@ return [
     'nav_outbound'     => 'Uitgaande routes',
     'nav_trunks'       => 'Trunks',
     'nav_cdr'                     => 'Gespreksregistraties',
+    'nav_gesprekspecificaties' => 'Gespreksspecificaties',
+    'nav_customers' => 'Klanten',
+    'nav_tarieven' => 'Tarieven',
     'nav_settings'                => 'Instellingen',
 
     'dashboard_title'       => 'Dashboard',

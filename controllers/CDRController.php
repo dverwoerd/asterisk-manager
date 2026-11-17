@@ -69,6 +69,131 @@ class CDRController extends BaseController
         redirect('?page=cdr');
     }
 
+    // ---- CSV-upload (handmatig importeren van CDR-records) ----
+
+    public function post_upload(): void
+    {
+        $this->requireOperator();
+        $f = $_FILES['cdr_csv'] ?? null;
+        if (!$f || $f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
+            $this->flash('error', 'Geen (geldig) bestand ontvangen.');
+            redirect('?page=cdr');
+        }
+        try {
+            [$nieuw, $dubbel, $fout] = self::importCsv($f['tmp_name']);
+            $this->flash('success', "CSV geimporteerd: $nieuw nieuw, $dubbel al aanwezig/overgeslagen" . ($fout ? ", $fout ongeldige regels" : '') . '.');
+        } catch (Exception $e) {
+            $this->flash('error', 'Import mislukt: ' . $e->getMessage());
+        }
+        redirect('?page=cdr');
+    }
+
+    /**
+     * Importeert een CDR-CSV. Ondersteunt:
+     *  - bestand met kopregel (kolomnamen als calldate/datum, src/van, dst/naar/bestemming,
+     *    billsec/duur, duration, disposition/status, clid, uniqueid), scheidingsteken , ; of tab
+     *  - Asterisk Master.csv zonder kopregel (vaste kolomvolgorde)
+     * Dubbele records (zelfde uniqueid, of zelfde datum+src+dst+billsec) worden overgeslagen.
+     * @return array{0:int,1:int,2:int} nieuw, dubbel/overgeslagen, ongeldig
+     */
+    public static function importCsv(string $path): array
+    {
+        $h = fopen($path, 'r');
+        if (!$h) throw new Exception('Kan bestand niet openen.');
+        $first = fgets($h);
+        if ($first === false) throw new Exception('Leeg bestand.');
+        $first = preg_replace('/^\xEF\xBB\xBF/', '', $first);
+        $delim = ',';
+        foreach ([';', "\t", ','] as $d) {
+            if (substr_count($first, $d) > substr_count($first, $delim)) $delim = $d;
+        }
+        rewind($h);
+
+        $alias = [
+            'calldate' => ['calldate','date','datum','start','starttime','datum/tijd','date/time','datetime'],
+            'src'      => ['src','source','from','van','bron','caller','toestel'],
+            'dst'      => ['dst','destination','to','naar','bestemming','called','nummer'],
+            'billsec'  => ['billsec','billable','billable sec','gespreksduur','seconds','sec','duur'],
+            'duration' => ['duration','totale duur','total'],
+            'disposition' => ['disposition','status','result','resultaat'],
+            'clid'     => ['clid','callerid'],
+            'uniqueid' => ['uniqueid','id','callid'],
+            'channel'  => ['channel'], 'dstchannel' => ['dstchannel'], 'dcontext' => ['dcontext'],
+            'lastapp'  => ['lastapp'], 'lastdata' => ['lastdata'], 'accountcode' => ['accountcode'], 'userfield' => ['userfield'],
+        ];
+
+        $map = null; $nieuw = 0; $dubbel = 0; $fout = 0; $regel = 0;
+        while (($row = fgetcsv($h, 8192, $delim)) !== false) {
+            $regel++;
+            if ($row === [null] || count($row) < 3) { if ($regel > 1) $fout++; continue; }
+            $row = array_map(fn($v) => trim((string)$v, " \t\"\xEF\xBB\xBF"), $row);
+
+            if ($regel === 1) {
+                $low = array_map('strtolower', $row);
+                $hasHeader = false;
+                foreach ($low as $c) foreach ($alias['dst'] as $a) if ($c === $a) $hasHeader = true;
+                if ($hasHeader) {
+                    $map = [];
+                    foreach ($alias as $field => $names) {
+                        foreach ($low as $i => $c) if (in_array($c, $names, true) && !in_array($i, $map, true)) { $map[$field] = $i; break; }
+                    }
+                    if (!isset($map['calldate'], $map['dst'])) throw new Exception('Kolommen calldate/datum en dst/bestemming ontbreken in de kopregel.');
+                    continue;
+                }
+                // Master.csv: accountcode,src,dst,dcontext,clid,channel,dstchannel,lastapp,lastdata,start,answer,end,duration,billsec,disposition,amaflags,uniqueid
+                // of de eenvoudige volgorde calldate,clid,src,dst,dcontext,channel,dstchannel,lastapp,lastdata,duration,billsec,disposition
+                $map = (count($row) >= 17)
+                    ? ['accountcode'=>0,'src'=>1,'dst'=>2,'dcontext'=>3,'clid'=>4,'channel'=>5,'dstchannel'=>6,'lastapp'=>7,'lastdata'=>8,'calldate'=>9,'duration'=>12,'billsec'=>13,'disposition'=>14,'uniqueid'=>16]
+                    : ['calldate'=>0,'clid'=>1,'src'=>2,'dst'=>3,'dcontext'=>4,'channel'=>5,'dstchannel'=>6,'lastapp'=>7,'lastdata'=>8,'duration'=>9,'billsec'=>10,'disposition'=>11,'accountcode'=>13,'uniqueid'=>14];
+            }
+
+            $g = fn($k) => isset($map[$k], $row[$map[$k]]) ? $row[$map[$k]] : '';
+            $datum = self::parseDatum($g('calldate'));
+            $dst   = $g('dst');
+            if ($datum === null || $dst === '') { $fout++; continue; }
+
+            $billsec  = self::parseSeconden($g('billsec'));
+            $duration = isset($map['duration']) ? self::parseSeconden($g('duration')) : $billsec;
+            $src      = $g('src');
+            $disp     = strtoupper($g('disposition'));
+            if (!in_array($disp, ['ANSWERED','NO ANSWER','FAILED','BUSY','CONGESTION'], true)) {
+                $disp = $billsec > 0 ? 'ANSWERED' : 'NO ANSWER';
+            }
+            $uid = $g('uniqueid');
+            if ($uid === '') $uid = 'csv-' . md5($datum . '|' . $src . '|' . $dst . '|' . $billsec);
+
+            $stmt = Database::query(
+                "INSERT IGNORE INTO cdr_records
+                 (calldate, clid, src, dst, dcontext, channel, dstchannel, lastapp, lastdata,
+                  duration, billsec, disposition, amaflags, accountcode, uniqueid, userfield)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?)",
+                [$datum, $g('clid'), $src, $dst, $g('dcontext'), $g('channel'), $g('dstchannel'),
+                 $g('lastapp'), $g('lastdata'), $duration, $billsec, $disp, $g('accountcode'), $uid, $g('userfield')]);
+            if ($stmt->rowCount() > 0) $nieuw++; else $dubbel++;
+        }
+        fclose($h);
+        return [$nieuw, $dubbel, $fout];
+    }
+
+    private static function parseDatum(string $s): ?string
+    {
+        if ($s === '') return null;
+        foreach (['Y-m-d H:i:s','Y-m-d H:i','d-m-Y H:i:s','d-m-Y H:i','d/m/Y H:i:s','d/m/Y H:i','Y/m/d H:i:s'] as $fmt) {
+            $d = DateTime::createFromFormat($fmt, $s);
+            if ($d && $d->format($fmt) === $s) return $d->format('Y-m-d H:i:s');
+        }
+        $t = strtotime($s);
+        return $t ? date('Y-m-d H:i:s', $t) : null;
+    }
+
+    private static function parseSeconden(string $s): int
+    {
+        if ($s === '') return 0;
+        if (preg_match('/^(\d+):(\d{2}):(\d{2})$/', $s, $m)) return $m[1]*3600 + $m[2]*60 + $m[3];
+        if (preg_match('/^(\d+):(\d{2})$/', $s, $m)) return $m[1]*60 + $m[2];
+        return (int)round((float)str_replace(',', '.', $s));
+    }
+
     public function export(): void
     {
         $dateFrom = $this->get('date_from', date('Y-m-01'));

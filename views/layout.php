@@ -66,6 +66,15 @@
         <a href="?page=cdr" class="nav-item<?= activeNav('cdr') ?>">
             <span class="nav-icon">▤</span><span class="nav-label"><?= t('nav_cdr') ?></span>
         </a>
+        <a href="?page=gesprekspecificaties" class="nav-item<?= activeNav('gesprekspecificaties') ?>">
+            <span class="nav-icon">☎</span><span class="nav-label"><?= t('nav_gesprekspecificaties') ?></span>
+        </a>
+        <a href="?page=customers" class="nav-item<?= activeNav('customers') ?>">
+            <span class="nav-icon">⊙</span><span class="nav-label"><?= t('nav_customers') ?></span>
+        </a>
+        <a href="?page=tarieven" class="nav-item<?= activeNav('tarieven') ?>">
+            <span class="nav-icon">€</span><span class="nav-label"><?= t('nav_tarieven') ?></span>
+        </a>
 
         <div class="nav-section-label">PROVISIONING</div>
         <a href="?page=provision" class="nav-item<?= activeNav('provision') ?>">
