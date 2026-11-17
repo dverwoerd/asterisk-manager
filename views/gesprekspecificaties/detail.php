@@ -3,20 +3,26 @@ $t   = $spec['totaal'];
 $eur = fn(float $v) => '€ ' . number_format($v, 2, ',', '.');
 $nl  = fn(float $v) => number_format($v, 3, ',', '.');
 ?>
-<div class="page-header">
-    <h1 class="page-title">
-        <?= sanitize($customer['company_name'] ?: $customer['contact_name']) ?>
-        <span style="font-weight:400;font-size:16px;color:var(--text-muted)">— <?= sanitize($maandLabel) ?></span>
-    </h1>
-    <div class="page-actions">
-        <a href="?page=gesprekspecificaties&maand=<?= $maand ?>" class="btn btn-ghost">← Terug</a>
-        <a href="?page=gesprekspecificaties&action=pdf&id=<?= $customer['id'] ?>&maand=<?= $maand ?>"
-           class="btn btn-accent" target="_blank">↓ PDF downloaden</a>
+<link rel="stylesheet" href="assets/css/gesprekspecificaties.css">
+<div class="gs">
+
+<header class="gs-header">
+    <div class="gs-logo">PT</div>
+    <div>
+        <h1><?= sanitize($customer['company_name'] ?: $customer['contact_name']) ?></h1>
+        <div class="sub">Gespreksspecificaties — <?= sanitize($maandLabel) ?></div>
     </div>
-</div>
+    <div class="gs-header-right">
+        <a href="?page=gesprekspecificaties&maand=<?= $maand ?>" class="btn btn-ghost btn-sm">← Terug</a>
+        <a href="?page=gesprekspecificaties&action=pdf&id=<?= $customer['id'] ?>&maand=<?= $maand ?>"
+           class="btn btn-yellow" target="_blank">⬇ PDF downloaden</a>
+    </div>
+</header>
+
+<div class="gs-main">
 
 <?php if (!empty($spec['zonder_tarief'])): ?>
-<div class="alert alert-warning mb-4">
+<div class="alert alert-warning">
     <strong>⚠ Geen tarief gevonden</strong> voor
     <?php
     $lijst = [];
@@ -29,30 +35,18 @@ $nl  = fn(float $v) => number_format($v, 3, ',', '.');
 </div>
 <?php endif; ?>
 
-<div class="stats-grid stats-grid-4 mb-4">
-    <div class="stat-card"><div class="stat-body">
-        <div class="stat-value"><?= number_format($t['aantal']) ?></div>
-        <div class="stat-label">Gesprekken</div>
-    </div></div>
-    <div class="stat-card"><div class="stat-body">
-        <div class="stat-value"><?= number_format($t['minuten']) ?></div>
-        <div class="stat-label">Minuten (afgerond)</div>
-    </div></div>
-    <div class="stat-card"><div class="stat-body">
-        <div class="stat-value"><?= count($spec['nummers']) ?></div>
-        <div class="stat-label">Gebelde nummers</div>
-    </div></div>
-    <div class="stat-card stat-accent"><div class="stat-body">
-        <div class="stat-value mono"><?= $eur($t['kosten']) ?></div>
-        <div class="stat-label">Kosten excl. BTW</div>
-    </div></div>
+<div class="stats-row">
+    <div class="stat-chip"><div class="val"><?= number_format($t['aantal'], 0, ',', '.') ?></div><div class="lbl">Gesprekken</div></div>
+    <div class="stat-chip"><div class="val"><?= number_format($t['minuten'], 0, ',', '.') ?></div><div class="lbl">Minuten</div></div>
+    <div class="stat-chip"><div class="val"><?= count($spec['nummers']) ?></div><div class="lbl">Nummers</div></div>
+    <div class="stat-chip geel"><div class="val"><?= $eur($t['kosten']) ?></div><div class="lbl">Totaal excl. BTW</div></div>
 </div>
 
 <!-- Per categorie (gelijk aan PDF) -->
-<div class="card mb-4">
+<div class="card">
     <div class="card-header">
         <h3 class="card-title">Per categorie</h3>
-        <span class="text-muted" style="font-size:12px">
+        <span class="card-hint">
             Starttarief € <?= $nl($tarieven['start']) ?> per gesprek ·
             Nationaal/088 € <?= $nl($tarieven['nationaal']) ?>/min ·
             Mobiel € <?= $nl($tarieven['mobiel']) ?>/min ·
@@ -65,27 +59,27 @@ $nl  = fn(float $v) => number_format($v, 3, ',', '.');
             <thead>
                 <tr>
                     <th>Categorie</th>
-                    <th class="text-right">Aantal gesprekken</th>
-                    <th class="text-right">Minuten</th>
+                    <th class="text-center">Aantal gesprekken</th>
+                    <th class="text-center">Minuten</th>
                     <th class="text-right">Totaal (€)</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($spec['categorieen'] as $cat => $g): ?>
-                <tr<?= $g['aantal'] === 0 ? ' class="text-muted"' : '' ?>>
+                <tr<?= $g['aantal'] === 0 ? ' class="leeg"' : '' ?>>
                     <td><?= sanitize($cat) ?></td>
-                    <td class="text-right mono"><?= $g['aantal'] ?></td>
-                    <td class="text-right mono"><?= $g['minuten'] ?></td>
+                    <td class="text-center"><?= $g['aantal'] ?></td>
+                    <td class="text-center"><?= $g['minuten'] ?></td>
                     <td class="text-right mono"><?= $eur($g['kosten']) ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
             <tfoot>
-                <tr style="background:var(--bg-secondary);font-weight:600">
+                <tr>
                     <td>Totaal</td>
-                    <td class="text-right mono"><?= $t['aantal'] ?></td>
-                    <td class="text-right mono"><?= $t['minuten'] ?></td>
-                    <td class="text-right mono" style="color:var(--accent)"><?= $eur($t['kosten']) ?></td>
+                    <td class="text-center"><?= $t['aantal'] ?></td>
+                    <td class="text-center"><?= $t['minuten'] ?></td>
+                    <td class="text-right mono"><?= $eur($t['kosten']) ?></td>
                 </tr>
             </tfoot>
         </table>
@@ -93,7 +87,7 @@ $nl  = fn(float $v) => number_format($v, 3, ',', '.');
 </div>
 
 <!-- Per nummer (samengevoegd) -->
-<div class="card mb-4">
+<div class="card">
     <div class="card-header">
         <h3 class="card-title">Specificatie per nummer</h3>
     </div>
@@ -105,8 +99,8 @@ $nl  = fn(float $v) => number_format($v, 3, ',', '.');
                     <th>Categorie</th>
                     <th>Bestemming</th>
                     <th>Toestel(len)</th>
-                    <th class="text-right">Aantal</th>
-                    <th class="text-right">Minuten</th>
+                    <th class="text-center">Aantal</th>
+                    <th class="text-center">Minuten</th>
                     <th class="text-right">Tarief/min</th>
                     <th class="text-right">Totaal (€)</th>
                 </tr>
@@ -119,26 +113,29 @@ $nl  = fn(float $v) => number_format($v, 3, ',', '.');
                     <td>
                         <?= sanitize($n['land'] ?: '-') ?>
                         <?php if (!$n['tarief_bekend']): ?>
-                        <span style="color:#C9A227" title="Geen tarief in bel_tarieven">⚠ geen tarief</span>
+                        <span class="warn-tag" title="Geen tarief in bel_tarieven">⚠ geen tarief</span>
                         <?php endif; ?>
                     </td>
                     <td class="mono"><?= sanitize(implode(', ', $n['toestellen'])) ?></td>
-                    <td class="text-right mono"><?= $n['aantal'] ?></td>
-                    <td class="text-right mono"><?= $n['minuten'] ?></td>
+                    <td class="text-center"><?= $n['aantal'] ?></td>
+                    <td class="text-center"><?= $n['minuten'] ?></td>
                     <td class="text-right mono text-muted">€ <?= $nl($n['tarief']) ?></td>
                     <td class="text-right mono"><strong><?= $eur($n['kosten']) ?></strong></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
             <tfoot>
-                <tr style="background:var(--bg-secondary);font-weight:600">
+                <tr>
                     <td colspan="4">Totaal</td>
-                    <td class="text-right mono"><?= $t['aantal'] ?></td>
-                    <td class="text-right mono"><?= $t['minuten'] ?></td>
+                    <td class="text-center"><?= $t['aantal'] ?></td>
+                    <td class="text-center"><?= $t['minuten'] ?></td>
                     <td></td>
-                    <td class="text-right mono" style="color:var(--accent)"><?= $eur($t['kosten']) ?></td>
+                    <td class="text-right mono"><?= $eur($t['kosten']) ?></td>
                 </tr>
             </tfoot>
         </table>
     </div>
 </div>
+
+</div><!-- /gs-main -->
+</div><!-- /gs -->
