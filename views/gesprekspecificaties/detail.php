@@ -5,7 +5,12 @@
     </h1>
     <div class="page-actions">
         <a href="?page=gesprekspecificaties&maand=<?= $maand ?>" class="btn btn-ghost">← Terug</a>
-        <a href="?page=gesprekspecificaties&action=pdf&id=<?= $customer['id'] ?>&maand=<?= $maand ?>"
+        <?php $basis = '?page=gesprekspecificaties&action=detail&id=' . $customer['id'] . '&maand=' . $maand; ?>
+        <a href="<?= $basis ?>&weergave=nummer"
+           class="btn <?= $weergave === 'nummer' ? 'btn-primary' : 'btn-ghost' ?>">Per nummer</a>
+        <a href="<?= $basis ?>&weergave=gesprek"
+           class="btn <?= $weergave === 'gesprek' ? 'btn-primary' : 'btn-ghost' ?>">Per gesprek</a>
+        <a href="?page=gesprekspecificaties&action=pdf&id=<?= $customer['id'] ?>&maand=<?= $maand ?>&weergave=<?= $weergave ?>"
            class="btn btn-accent" target="_blank">
             ↓ PDF downloaden
         </a>
@@ -50,6 +55,7 @@
             <thead>
                 <tr>
                     <th>Categorie</th>
+                    <th class="text-right">Nummers</th>
                     <th class="text-right">Gesprekken</th>
                     <th class="text-right">Totale duur</th>
                     <th class="text-right">Kosten</th>
@@ -64,6 +70,7 @@
                             <?= sanitize($cat) ?>
                         </span>
                     </td>
+                    <td class="text-right mono"><?= $data['aantal_nummers'] ?></td>
                     <td class="text-right mono"><?= $data['aantal'] ?></td>
                     <td class="text-right mono"><?= formatDuration($data['sec']) ?></td>
                     <td class="text-right mono"><strong>€ <?= number_format($data['kosten'], 2, ',', '.') ?></strong></td>
@@ -76,6 +83,7 @@
             <tfoot>
                 <tr style="background:var(--bg-secondary);font-weight:600">
                     <td>Totaal</td>
+                    <td class="text-right mono"><?= array_sum(array_column($perCategorie, 'aantal_nummers')) ?></td>
                     <td class="text-right mono"><?= $totaalAantal ?></td>
                     <td class="text-right mono"><?= formatDuration($totaalSec) ?></td>
                     <td class="text-right mono" style="color:var(--accent)">€ <?= number_format($totaalKosten, 2, ',', '.') ?></td>
@@ -93,6 +101,9 @@
          onclick="toggleSection('cat-<?= htmlspecialchars(preg_replace('/[^a-z0-9]/i','', $cat)) ?>')">
         <h3 class="card-title">
             <?= sanitize($cat) ?>
+            <?php if ($weergave === 'nummer'): ?>
+            <span class="badge ms-2"><?= $data['aantal_nummers'] ?> nummers</span>
+            <?php endif; ?>
             <span class="badge ms-2"><?= $data['aantal'] ?> gesprekken</span>
             <span style="margin-left:8px;color:var(--text-muted);font-size:13px;font-weight:400">
                 € <?= number_format($data['kosten'], 2, ',', '.') ?>
@@ -101,6 +112,47 @@
         <span class="toggle-icon" id="icon-cat-<?= preg_replace('/[^a-z0-9]/i','', $cat) ?>">▼</span>
     </div>
     <div id="cat-<?= preg_replace('/[^a-z0-9]/i','', $cat) ?>" class="card-body p-0">
+        <?php if ($weergave === 'nummer'): ?>
+        <table class="data-table data-table-sm">
+            <thead>
+                <tr>
+                    <th>Nummer</th>
+                    <th>Omschrijving</th>
+                    <th>Toestel(len)</th>
+                    <th>Periode</th>
+                    <th class="text-right">Gesprekken</th>
+                    <th class="text-right">Duur</th>
+                    <th class="text-right">Gem. duur</th>
+                    <th class="text-right">Kosten</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($data['nummers'] as $n): ?>
+                <tr>
+                    <td class="mono"><strong><?= sanitize($n['nummer']) ?></strong></td>
+                    <td><?= sanitize($n['destination_name'] ?: '-') ?></td>
+                    <td class="mono"><?= sanitize(implode(', ', $n['toestellen'])) ?></td>
+                    <td class="mono text-muted">
+                        <?= date('d-m', strtotime($n['eerste'])) ?><?php if (substr($n['eerste'],0,10) !== substr($n['laatste'],0,10)): ?> t/m <?= date('d-m', strtotime($n['laatste'])) ?><?php endif; ?>
+                    </td>
+                    <td class="text-right mono"><?= $n['aantal'] ?></td>
+                    <td class="text-right mono"><?= formatDuration($n['sec']) ?></td>
+                    <td class="text-right mono"><?= formatDuration($n['gem_sec']) ?></td>
+                    <td class="text-right mono"><strong>€ <?= number_format($n['kosten'], 2, ',', '.') ?></strong></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+            <tfoot>
+                <tr style="background:var(--bg-secondary);font-weight:600">
+                    <td colspan="4">Subtotaal <?= sanitize($cat) ?></td>
+                    <td class="text-right mono"><?= $data['aantal'] ?></td>
+                    <td class="text-right mono"><?= formatDuration($data['sec']) ?></td>
+                    <td></td>
+                    <td class="text-right mono" style="color:var(--accent)">€ <?= number_format($data['kosten'], 2, ',', '.') ?></td>
+                </tr>
+            </tfoot>
+        </table>
+        <?php else: ?>
         <table class="data-table data-table-sm">
             <thead>
                 <tr>
@@ -137,6 +189,7 @@
                 </tr>
             </tfoot>
         </table>
+        <?php endif; ?>
     </div>
 </div>
 <?php endforeach; ?>

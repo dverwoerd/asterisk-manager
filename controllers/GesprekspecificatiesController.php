@@ -103,7 +103,8 @@ class GesprekspecificatiesController extends BaseController
 
         $totaalAantal  = count($calls);
         $totaalSec     = array_sum(array_column($calls, 'billsec'));
-        $totaalKosten  = array_sum(array_column($calls, 'cost'));
+        $totaalKosten  = self::totaalKosten($perCategorie);
+        $weergave      = $this->weergave();
 
         $maandLabel = $this->maandNaam($mnr) . ' ' . $jaar;
 
@@ -118,6 +119,7 @@ class GesprekspecificatiesController extends BaseController
             'totaalAantal'  => $totaalAantal,
             'totaalSec'     => $totaalSec,
             'totaalKosten'  => $totaalKosten,
+            'weergave'      => $weergave,
         ]);
     }
 
@@ -148,7 +150,13 @@ class GesprekspecificatiesController extends BaseController
         ];
 
         require_once APP_ROOT . '/includes/GesprekPDF.php';
-        GesprekPDF::download($customer, $company, $maandLabel, $perCategorie);
+        GesprekPDF::download($customer, $company, $maandLabel, $perCategorie, $this->weergave());
+    }
+
+    /** 'nummer' (standaard, samengevoegd per bestemming) of 'gesprek' (elk gesprek los). */
+    private function weergave(): string
+    {
+        return $this->get('weergave', 'nummer') === 'gesprek' ? 'gesprek' : 'nummer';
     }
 
     // ================================================================
@@ -207,26 +215,109 @@ class GesprekspecificatiesController extends BaseController
         return $rows;
     }
 
+    /**
+     * Groepeert gesprekken per categorie en daarbinnen per bestemmingsnummer.
+     *
+     * Berekening:
+     *  - Kosten worden per gesprek berekend door applyRatesToCDR() (tariefstap +
+     *    starttarief per gesprek) en hier alleen opgeteld. Nooit opnieuw berekenen
+     *    vanuit totale duur x tarief: dat geeft een ander (te laag) bedrag.
+     *  - Optellen gebeurt in hele 1/10.000 euro (cost is DECIMAL(10,4)), zodat er
+     *    geen float-afwijkingen ontstaan. Afronding naar centen pas bij weergave.
+     *  - Nummers worden genormaliseerd (0612.., 0031612.., +31612.. = één regel).
+     */
     private function groepeerOpCategorie(array $calls): array
     {
+        $leeg = fn() => ['calls' => [], 'nummers' => [], 'aantal' => 0, 'sec' => 0, 'kosten_e4' => 0];
+
         $groepen = [];
         foreach (self::CATEGORIEEN as $cat) {
-            $groepen[$cat] = ['calls' => [], 'aantal' => 0, 'sec' => 0, 'kosten' => 0.0];
+            $groepen[$cat] = $leeg();
         }
 
         foreach ($calls as $c) {
             $cat = $c['categorie'];
             if (!isset($groepen[$cat])) {
-                $groepen[$cat] = ['calls' => [], 'aantal' => 0, 'sec' => 0, 'kosten' => 0.0];
+                $groepen[$cat] = $leeg();
             }
-            $groepen[$cat]['calls'][]  = $c;
-            $groepen[$cat]['aantal']  += 1;
-            $groepen[$cat]['sec']     += (int)$c['billsec'];
-            $groepen[$cat]['kosten']  += (float)$c['cost'];
+            $sec = (int)$c['billsec'];
+            $e4  = (int)round((float)$c['cost'] * 10000);
+
+            $groepen[$cat]['calls'][]    = $c;
+            $groepen[$cat]['aantal']    += 1;
+            $groepen[$cat]['sec']       += $sec;
+            $groepen[$cat]['kosten_e4'] += $e4;
+
+            // ---- per nummer ----
+            $key = self::normaliseerNummer($c['dst']);
+            $n   = &$groepen[$cat]['nummers'][$key];
+            if ($n === null) {
+                $n = [
+                    'nummer'           => self::toonNummer($key),
+                    'destination_name' => $c['destination_name'] ?? '',
+                    'toestellen'       => [],
+                    'aantal'           => 0,
+                    'sec'              => 0,
+                    'kosten_e4'        => 0,
+                    'eerste'           => $c['calldate'],
+                    'laatste'          => $c['calldate'],
+                ];
+            }
+            $n['aantal']    += 1;
+            $n['sec']       += $sec;
+            $n['kosten_e4'] += $e4;
+            $n['toestellen'][$c['src']] = true;
+            if ($c['calldate'] < $n['eerste'])  $n['eerste']  = $c['calldate'];
+            if ($c['calldate'] > $n['laatste']) $n['laatste'] = $c['calldate'];
+            if ($n['destination_name'] === '' && !empty($c['destination_name'])) {
+                $n['destination_name'] = $c['destination_name'];
+            }
+            unset($n);
         }
 
         // Verwijder lege categorieën
-        return array_filter($groepen, fn($g) => $g['aantal'] > 0);
+        $groepen = array_filter($groepen, fn($g) => $g['aantal'] > 0);
+
+        // Afronden + sorteren (hoogste kosten eerst, dan meeste gesprekken, dan nummer)
+        foreach ($groepen as &$g) {
+            $g['kosten'] = $g['kosten_e4'] / 10000;
+            foreach ($g['nummers'] as &$n) {
+                $n['kosten']     = $n['kosten_e4'] / 10000;
+                $n['gem_sec']    = $n['aantal'] > 0 ? (int)round($n['sec'] / $n['aantal']) : 0;
+                $n['toestellen'] = array_keys($n['toestellen']);
+                sort($n['toestellen'], SORT_NATURAL);
+            }
+            unset($n);
+            uasort($g['nummers'], fn($a, $b) =>
+                [$b['kosten_e4'], $b['aantal'], $a['nummer']] <=> [$a['kosten_e4'], $a['aantal'], $b['nummer']]
+            );
+            $g['aantal_nummers'] = count($g['nummers']);
+        }
+        unset($g);
+
+        return $groepen;
+    }
+
+    /** Sleutel voor groepering: internationaal formaat zonder + of 00 (bijv. 31612345678). */
+    public static function normaliseerNummer(string $dst): string
+    {
+        $n = preg_replace('/\D/', '', $dst);
+        if (str_starts_with($n, '00')) return substr($n, 2);
+        if (str_starts_with($n, '0') && strlen($n) > 1) return '31' . substr($n, 1);
+        return $n;
+    }
+
+    /** Weergave: NL-nummers nationaal (0612345678), buitenland met + (+441234567890). */
+    public static function toonNummer(string $norm): string
+    {
+        if (str_starts_with($norm, '31') && strlen($norm) > 4) return '0' . substr($norm, 2);
+        return strlen($norm) > 6 ? '+' . $norm : $norm;
+    }
+
+    /** Totale kosten over alle categorieën, exact (zelfde basis als factuur). */
+    public static function totaalKosten(array $perCategorie): float
+    {
+        return array_sum(array_column($perCategorie, 'kosten_e4')) / 10000;
     }
 
     public static function categoriseer(string $dst): string
