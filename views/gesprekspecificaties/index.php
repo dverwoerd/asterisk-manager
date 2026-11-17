@@ -69,7 +69,7 @@
                 <tr>
                     <th>Klant</th>
                     <th class="text-right">Gesprekken</th>
-                    <th class="text-right">Totale duur</th>
+                    <th class="text-right">Minuten</th>
                     <th class="text-right">Kosten excl. BTW</th>
                     <th class="text-center" style="width:180px">Acties</th>
                 </tr>
@@ -79,11 +79,16 @@
                 <tr>
                     <td><strong><?= sanitize($r['naam']) ?></strong></td>
                     <td class="text-right mono"><?= number_format($r['aantal']) ?></td>
-                    <td class="text-right mono"><?= formatDuration($r['totaal_sec']) ?></td>
+                    <td class="text-right mono"><?= number_format($r['totaal_min']) ?></td>
                     <td class="text-right mono">
                         <strong style="color:var(--accent)">
                             € <?= number_format($r['totaal_kosten'], 2, ',', '.') ?>
                         </strong>
+                        <?php if ($r['zonder_tarief'] > 0): ?>
+                        <br><span style="color:var(--warning, #C9A227);font-size:11px" title="Gesprekken zonder tarief in bel_tarieven, als € 0,00 meegeteld">
+                            ⚠ <?= $r['zonder_tarief'] ?> zonder tarief
+                        </span>
+                        <?php endif; ?>
                     </td>
                     <td class="text-center">
                         <a href="?page=gesprekspecificaties&action=detail&id=<?= $r['id'] ?>&maand=<?= $r['maand'] ?>"
@@ -102,7 +107,7 @@
                 <tr style="background:var(--bg-secondary);font-weight:600">
                     <td>Totaal</td>
                     <td class="text-right mono"><?= number_format(array_sum(array_column($overzicht, 'aantal'))) ?></td>
-                    <td class="text-right mono"><?= formatDuration(array_sum(array_column($overzicht, 'totaal_sec'))) ?></td>
+                    <td class="text-right mono"><?= number_format(array_sum(array_column($overzicht, 'totaal_min'))) ?></td>
                     <td class="text-right mono" style="color:var(--accent)">
                         € <?= number_format(array_sum(array_column($overzicht, 'totaal_kosten')), 2, ',', '.') ?>
                     </td>

@@ -1,3 +1,8 @@
+<?php
+$t   = $spec['totaal'];
+$eur = fn(float $v) => '€ ' . number_format($v, 2, ',', '.');
+$nl  = fn(float $v) => number_format($v, 3, ',', '.');
+?>
 <div class="page-header">
     <h1 class="page-title">
         <?= sanitize($customer['company_name'] ?: $customer['contact_name']) ?>
@@ -5,202 +10,135 @@
     </h1>
     <div class="page-actions">
         <a href="?page=gesprekspecificaties&maand=<?= $maand ?>" class="btn btn-ghost">← Terug</a>
-        <?php $basis = '?page=gesprekspecificaties&action=detail&id=' . $customer['id'] . '&maand=' . $maand; ?>
-        <a href="<?= $basis ?>&weergave=nummer"
-           class="btn <?= $weergave === 'nummer' ? 'btn-primary' : 'btn-ghost' ?>">Per nummer</a>
-        <a href="<?= $basis ?>&weergave=gesprek"
-           class="btn <?= $weergave === 'gesprek' ? 'btn-primary' : 'btn-ghost' ?>">Per gesprek</a>
-        <a href="?page=gesprekspecificaties&action=pdf&id=<?= $customer['id'] ?>&maand=<?= $maand ?>&weergave=<?= $weergave ?>"
-           class="btn btn-accent" target="_blank">
-            ↓ PDF downloaden
-        </a>
+        <a href="?page=gesprekspecificaties&action=pdf&id=<?= $customer['id'] ?>&maand=<?= $maand ?>"
+           class="btn btn-accent" target="_blank">↓ PDF downloaden</a>
     </div>
 </div>
 
-<!-- Samenvatting -->
+<?php if (!empty($spec['zonder_tarief'])): ?>
+<div class="alert alert-warning mb-4">
+    <strong>⚠ Geen tarief gevonden</strong> voor
+    <?php
+    $lijst = [];
+    foreach ($spec['zonder_tarief'] as $nr => $cnt) {
+        $lijst[] = '<span class="mono">' . sanitize(GesprekspecificatiesController::toonNummer((string)$nr)) . '</span> (' . $cnt . 'x)';
+    }
+    echo implode(', ', $lijst);
+    ?>.
+    Deze gesprekken zijn als € 0,00 meegeteld. Voeg de prefix toe in de tabel <code>bel_tarieven</code>.
+</div>
+<?php endif; ?>
+
 <div class="stats-grid stats-grid-4 mb-4">
-    <div class="stat-card">
-        <div class="stat-body">
-            <div class="stat-value"><?= number_format($totaalAantal) ?></div>
-            <div class="stat-label">Gesprekken</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-body">
-            <div class="stat-value"><?= formatDuration($totaalSec) ?></div>
-            <div class="stat-label">Totale duur</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-body">
-            <div class="stat-value"><?= count($perCategorie) ?></div>
-            <div class="stat-label">Categorieën</div>
-        </div>
-    </div>
-    <div class="stat-card stat-accent">
-        <div class="stat-body">
-            <div class="stat-value mono">€ <?= number_format($totaalKosten, 2, ',', '.') ?></div>
-            <div class="stat-label">Kosten excl. BTW</div>
-        </div>
-    </div>
+    <div class="stat-card"><div class="stat-body">
+        <div class="stat-value"><?= number_format($t['aantal']) ?></div>
+        <div class="stat-label">Gesprekken</div>
+    </div></div>
+    <div class="stat-card"><div class="stat-body">
+        <div class="stat-value"><?= number_format($t['minuten']) ?></div>
+        <div class="stat-label">Minuten (afgerond)</div>
+    </div></div>
+    <div class="stat-card"><div class="stat-body">
+        <div class="stat-value"><?= count($spec['nummers']) ?></div>
+        <div class="stat-label">Gebelde nummers</div>
+    </div></div>
+    <div class="stat-card stat-accent"><div class="stat-body">
+        <div class="stat-value mono"><?= $eur($t['kosten']) ?></div>
+        <div class="stat-label">Kosten excl. BTW</div>
+    </div></div>
 </div>
 
-<!-- Samenvatting per categorie -->
+<!-- Per categorie (gelijk aan PDF) -->
 <div class="card mb-4">
     <div class="card-header">
-        <h3 class="card-title">Samenvatting per categorie</h3>
+        <h3 class="card-title">Per categorie</h3>
+        <span class="text-muted" style="font-size:12px">
+            Starttarief € <?= $nl($tarieven['start']) ?> per gesprek ·
+            Nationaal/088 € <?= $nl($tarieven['nationaal']) ?>/min ·
+            Mobiel € <?= $nl($tarieven['mobiel']) ?>/min ·
+            Internationaal/0900 volgens tarieftabel · 0800 gratis ·
+            minuten naar boven afgerond
+        </span>
     </div>
     <div class="card-body p-0">
         <table class="data-table">
             <thead>
                 <tr>
                     <th>Categorie</th>
-                    <th class="text-right">Nummers</th>
-                    <th class="text-right">Gesprekken</th>
-                    <th class="text-right">Totale duur</th>
-                    <th class="text-right">Kosten</th>
-                    <th class="text-right">% van totaal</th>
+                    <th class="text-right">Aantal gesprekken</th>
+                    <th class="text-right">Minuten</th>
+                    <th class="text-right">Totaal (€)</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($perCategorie as $cat => $data): ?>
-                <tr>
-                    <td>
-                        <span class="badge badge-<?= strtolower(preg_replace('/[^a-z0-9]/i', '', $cat)) ?>">
-                            <?= sanitize($cat) ?>
-                        </span>
-                    </td>
-                    <td class="text-right mono"><?= $data['aantal_nummers'] ?></td>
-                    <td class="text-right mono"><?= $data['aantal'] ?></td>
-                    <td class="text-right mono"><?= formatDuration($data['sec']) ?></td>
-                    <td class="text-right mono"><strong>€ <?= number_format($data['kosten'], 2, ',', '.') ?></strong></td>
-                    <td class="text-right mono text-muted">
-                        <?= $totaalKosten > 0 ? number_format($data['kosten'] / $totaalKosten * 100, 1) : '0' ?>%
-                    </td>
+                <?php foreach ($spec['categorieen'] as $cat => $g): ?>
+                <tr<?= $g['aantal'] === 0 ? ' class="text-muted"' : '' ?>>
+                    <td><?= sanitize($cat) ?></td>
+                    <td class="text-right mono"><?= $g['aantal'] ?></td>
+                    <td class="text-right mono"><?= $g['minuten'] ?></td>
+                    <td class="text-right mono"><?= $eur($g['kosten']) ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
             <tfoot>
                 <tr style="background:var(--bg-secondary);font-weight:600">
                     <td>Totaal</td>
-                    <td class="text-right mono"><?= array_sum(array_column($perCategorie, 'aantal_nummers')) ?></td>
-                    <td class="text-right mono"><?= $totaalAantal ?></td>
-                    <td class="text-right mono"><?= formatDuration($totaalSec) ?></td>
-                    <td class="text-right mono" style="color:var(--accent)">€ <?= number_format($totaalKosten, 2, ',', '.') ?></td>
-                    <td></td>
+                    <td class="text-right mono"><?= $t['aantal'] ?></td>
+                    <td class="text-right mono"><?= $t['minuten'] ?></td>
+                    <td class="text-right mono" style="color:var(--accent)"><?= $eur($t['kosten']) ?></td>
                 </tr>
             </tfoot>
         </table>
     </div>
 </div>
 
-<!-- Detail per categorie -->
-<?php foreach ($perCategorie as $cat => $data): ?>
+<!-- Per nummer (samengevoegd) -->
 <div class="card mb-4">
-    <div class="card-header" style="cursor:pointer"
-         onclick="toggleSection('cat-<?= htmlspecialchars(preg_replace('/[^a-z0-9]/i','', $cat)) ?>')">
-        <h3 class="card-title">
-            <?= sanitize($cat) ?>
-            <?php if ($weergave === 'nummer'): ?>
-            <span class="badge ms-2"><?= $data['aantal_nummers'] ?> nummers</span>
-            <?php endif; ?>
-            <span class="badge ms-2"><?= $data['aantal'] ?> gesprekken</span>
-            <span style="margin-left:8px;color:var(--text-muted);font-size:13px;font-weight:400">
-                € <?= number_format($data['kosten'], 2, ',', '.') ?>
-            </span>
-        </h3>
-        <span class="toggle-icon" id="icon-cat-<?= preg_replace('/[^a-z0-9]/i','', $cat) ?>">▼</span>
+    <div class="card-header">
+        <h3 class="card-title">Specificatie per nummer</h3>
     </div>
-    <div id="cat-<?= preg_replace('/[^a-z0-9]/i','', $cat) ?>" class="card-body p-0">
-        <?php if ($weergave === 'nummer'): ?>
+    <div class="card-body p-0">
         <table class="data-table data-table-sm">
             <thead>
                 <tr>
                     <th>Nummer</th>
-                    <th>Omschrijving</th>
+                    <th>Categorie</th>
+                    <th>Bestemming</th>
                     <th>Toestel(len)</th>
-                    <th>Periode</th>
-                    <th class="text-right">Gesprekken</th>
-                    <th class="text-right">Duur</th>
-                    <th class="text-right">Gem. duur</th>
-                    <th class="text-right">Kosten</th>
+                    <th class="text-right">Aantal</th>
+                    <th class="text-right">Minuten</th>
+                    <th class="text-right">Tarief/min</th>
+                    <th class="text-right">Totaal (€)</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($data['nummers'] as $n): ?>
+                <?php foreach ($spec['nummers'] as $n): ?>
                 <tr>
                     <td class="mono"><strong><?= sanitize($n['nummer']) ?></strong></td>
-                    <td><?= sanitize($n['destination_name'] ?: '-') ?></td>
-                    <td class="mono"><?= sanitize(implode(', ', $n['toestellen'])) ?></td>
-                    <td class="mono text-muted">
-                        <?= date('d-m', strtotime($n['eerste'])) ?><?php if (substr($n['eerste'],0,10) !== substr($n['laatste'],0,10)): ?> t/m <?= date('d-m', strtotime($n['laatste'])) ?><?php endif; ?>
-                    </td>
-                    <td class="text-right mono"><?= $n['aantal'] ?></td>
-                    <td class="text-right mono"><?= formatDuration($n['sec']) ?></td>
-                    <td class="text-right mono"><?= formatDuration($n['gem_sec']) ?></td>
-                    <td class="text-right mono"><strong>€ <?= number_format($n['kosten'], 2, ',', '.') ?></strong></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-            <tfoot>
-                <tr style="background:var(--bg-secondary);font-weight:600">
-                    <td colspan="4">Subtotaal <?= sanitize($cat) ?></td>
-                    <td class="text-right mono"><?= $data['aantal'] ?></td>
-                    <td class="text-right mono"><?= formatDuration($data['sec']) ?></td>
-                    <td></td>
-                    <td class="text-right mono" style="color:var(--accent)">€ <?= number_format($data['kosten'], 2, ',', '.') ?></td>
-                </tr>
-            </tfoot>
-        </table>
-        <?php else: ?>
-        <table class="data-table data-table-sm">
-            <thead>
-                <tr>
-                    <th>Datum</th>
-                    <th>Tijd</th>
-                    <th>Toestel</th>
-                    <th>Bestemming</th>
-                    <th class="text-right">Duur</th>
-                    <th class="text-right">Kosten</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($data['calls'] as $call): ?>
-                <tr>
-                    <td class="mono"><?= date('d-m-Y', strtotime($call['calldate'])) ?></td>
-                    <td class="mono"><?= date('H:i:s', strtotime($call['calldate'])) ?></td>
-                    <td class="mono"><?= sanitize($call['src']) ?></td>
-                    <td class="mono">
-                        <?= sanitize($call['dst']) ?>
-                        <?php if (!empty($call['destination_name'])): ?>
-                        <span class="text-muted" style="font-size:11px"> — <?= sanitize($call['destination_name']) ?></span>
+                    <td><?= sanitize($n['categorie']) ?></td>
+                    <td>
+                        <?= sanitize($n['land'] ?: '-') ?>
+                        <?php if (!$n['tarief_bekend']): ?>
+                        <span style="color:#C9A227" title="Geen tarief in bel_tarieven">⚠ geen tarief</span>
                         <?php endif; ?>
                     </td>
-                    <td class="text-right mono"><?= formatDuration((int)$call['billsec']) ?></td>
-                    <td class="text-right mono">€ <?= number_format((float)$call['cost'], 4, ',', '.') ?></td>
+                    <td class="mono"><?= sanitize(implode(', ', $n['toestellen'])) ?></td>
+                    <td class="text-right mono"><?= $n['aantal'] ?></td>
+                    <td class="text-right mono"><?= $n['minuten'] ?></td>
+                    <td class="text-right mono text-muted">€ <?= $nl($n['tarief']) ?></td>
+                    <td class="text-right mono"><strong><?= $eur($n['kosten']) ?></strong></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
             <tfoot>
                 <tr style="background:var(--bg-secondary);font-weight:600">
-                    <td colspan="4">Subtotaal <?= sanitize($cat) ?></td>
-                    <td class="text-right mono"><?= formatDuration($data['sec']) ?></td>
-                    <td class="text-right mono" style="color:var(--accent)">€ <?= number_format($data['kosten'], 2, ',', '.') ?></td>
+                    <td colspan="4">Totaal</td>
+                    <td class="text-right mono"><?= $t['aantal'] ?></td>
+                    <td class="text-right mono"><?= $t['minuten'] ?></td>
+                    <td></td>
+                    <td class="text-right mono" style="color:var(--accent)"><?= $eur($t['kosten']) ?></td>
                 </tr>
             </tfoot>
         </table>
-        <?php endif; ?>
     </div>
 </div>
-<?php endforeach; ?>
-
-<script>
-function toggleSection(id) {
-    const el   = document.getElementById(id);
-    const icon = document.getElementById('icon-' + id);
-    if (!el) return;
-    const isHidden = el.style.display === 'none';
-    el.style.display   = isHidden ? '' : 'none';
-    if (icon) icon.textContent = isHidden ? '▼' : '▶';
-}
-</script>

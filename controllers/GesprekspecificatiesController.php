@@ -1,13 +1,25 @@
 <?php
 // ============================================================
 // GesprekspecificatiesController
-// Genereert per-klant per-maand overzichten vanuit cdr_records
+// Per-klant per-maand gespreksspecificaties vanuit cdr_records.
+//
+// Berekening identiek aan cdr.pantronic.nl:
+//   - alleen beantwoorde uitgaande gesprekken (billsec > 0)
+//   - minuten per gesprek naar boven afgerond (ceil(billsec / 60))
+//   - kosten per gesprek = starttarief + minuten x minuuttarief
+//       Nationaal / 088 : billing_tarief_nationaal (0,025)
+//       Mobiel          : billing_tarief_mobiel    (0,065)
+//       Internationaal  : bel_tarieven, prefix 4 -> 3 -> 2 cijfers
+//       0900 Premium    : bel_tarieven (prefix 3190)
+//       0800 Gratis     : 0 (ook geen starttarief)
+//   - starttarief: billing_starttarief (0,065)
+//   - kosten per gesprek afgerond op 4 decimalen, totalen daarna op centen
+//   - nummer zonder tarief in bel_tarieven: kosten 0 + melding
 // ============================================================
 require_once APP_ROOT . '/controllers/BaseController.php';
 
 class GesprekspecificatiesController extends BaseController
 {
-    // Categorieën in vaste volgorde voor consistente weergave
     const CATEGORIEEN = [
         'Nationaal',
         'Mobiel',
@@ -17,55 +29,39 @@ class GesprekspecificatiesController extends BaseController
         '0900 Premium',
     ];
 
+    private static ?array $tarieven = null;
+
     // ---- index: maandkiezer + klantenlijst met samenvatting ----
 
     public function index(): void
     {
-        $maand = $this->get('maand', date('Y-m'));          // bijv. 2026-11
-        [$jaar, $mnr] = explode('-', $maand . '-01');
-
-        $dateFrom = "$jaar-$mnr-01";
-        $dateTo   = date('Y-m-t', strtotime($dateFrom));    // laatste dag van de maand
+        $maand = $this->get('maand', date('Y-m'));
+        [$dateFrom, $dateTo, $jaar, $mnr] = $this->periode($maand);
 
         $customers = Database::fetchAll(
             "SELECT id, company_name, contact_name, extensions_csv
              FROM customers WHERE active=1 ORDER BY company_name, contact_name"
         );
 
-        // Per klant: samenvatting van CDR voor de gekozen maand
         $overzicht = [];
         foreach ($customers as $c) {
-            $exts = $this->extensiesVanKlant($c);
-            if (empty($exts)) continue;
-
-            $ph  = implode(',', array_fill(0, count($exts), '?'));
-            $sum = Database::fetchOne(
-                "SELECT COUNT(*) AS aantal,
-                        COALESCE(SUM(billsec),0) AS totaal_sec,
-                        COALESCE(SUM(cost),0)    AS totaal_kosten
-                 FROM cdr_records
-                 WHERE src IN ($ph)
-                   AND DATE(calldate) BETWEEN ? AND ?
-                   AND disposition = 'ANSWERED'
-                   AND billsec > 0",
-                [...$exts, $dateFrom, $dateTo]
-            );
-
-            if (!$sum || (int)$sum['aantal'] === 0) continue;
+            $calls = $this->fetchCalls($c, $dateFrom, $dateTo);
+            if (empty($calls)) continue;
 
             $overzicht[] = [
-                'id'            => $c['id'],
-                'naam'          => $c['company_name'] ?: $c['contact_name'],
-                'aantal'        => (int)$sum['aantal'],
-                'totaal_sec'    => (int)$sum['totaal_sec'],
-                'totaal_kosten' => (float)$sum['totaal_kosten'],
-                'maand'         => $maand,
-                'dateFrom'      => $dateFrom,
-                'dateTo'        => $dateTo,
+                'id'               => $c['id'],
+                'naam'             => $c['company_name'] ?: $c['contact_name'],
+                'aantal'           => count($calls),
+                'totaal_sec'       => array_sum(array_column($calls, 'billsec')),
+                'totaal_min'       => array_sum(array_column($calls, 'minuten')),
+                'totaal_kosten'    => self::somKosten($calls),
+                'zonder_tarief'    => count(array_filter($calls, fn($x) => !$x['tarief_bekend'])),
+                'maand'            => $maand,
+                'dateFrom'         => $dateFrom,
+                'dateTo'           => $dateTo,
             ];
         }
 
-        // Beschikbare maanden (vanuit CDR)
         $maanden = Database::fetchAll(
             "SELECT DISTINCT DATE_FORMAT(calldate, '%Y-%m') AS maand
              FROM cdr_records
@@ -84,83 +80,236 @@ class GesprekspecificatiesController extends BaseController
         ]);
     }
 
-    // ---- detail: uitgebreid overzicht per klant + maand ----
+    // ---- detail: per klant + maand ----
 
     public function detail(): void
     {
         $customerId = $this->id();
         $maand      = $this->get('maand', date('Y-m'));
-        [$jaar, $mnr] = explode('-', $maand . '-01');
-
-        $dateFrom = "$jaar-$mnr-01";
-        $dateTo   = date('Y-m-t', strtotime($dateFrom));
+        [$dateFrom, $dateTo, $jaar, $mnr] = $this->periode($maand);
 
         $customer = Database::fetchOne("SELECT * FROM customers WHERE id=?", [$customerId]);
         if (!$customer) redirect('?page=gesprekspecificaties');
 
         $calls = $this->fetchCalls($customer, $dateFrom, $dateTo);
-        $perCategorie = $this->groepeerOpCategorie($calls);
-
-        $totaalAantal  = count($calls);
-        $totaalSec     = array_sum(array_column($calls, 'billsec'));
-        $totaalKosten  = self::totaalKosten($perCategorie);
-        $weergave      = $this->weergave();
-
-        $maandLabel = $this->maandNaam($mnr) . ' ' . $jaar;
+        $spec  = self::bouwSpecificatie($calls);
 
         $this->view('gesprekspecificaties.detail', [
-            'title'         => 'Gespreksspecificaties — ' . ($customer['company_name'] ?: $customer['contact_name']),
-            'customer'      => $customer,
-            'maand'         => $maand,
-            'maandLabel'    => $maandLabel,
-            'dateFrom'      => $dateFrom,
-            'dateTo'        => $dateTo,
-            'perCategorie'  => $perCategorie,
-            'totaalAantal'  => $totaalAantal,
-            'totaalSec'     => $totaalSec,
-            'totaalKosten'  => $totaalKosten,
-            'weergave'      => $weergave,
+            'title'      => 'Gespreksspecificaties — ' . ($customer['company_name'] ?: $customer['contact_name']),
+            'customer'   => $customer,
+            'maand'      => $maand,
+            'maandLabel' => $this->maandNaam($mnr) . ' ' . $jaar,
+            'spec'       => $spec,
+            'tarieven'   => $this->tariefInstellingen(),
         ]);
     }
 
-    // ---- pdf: download Pantronic Gespreksspecificatie PDF ----
+    // ---- pdf: download in cdr.pantronic.nl-opmaak ----
 
     public function pdf(): void
     {
         $customerId = $this->id();
         $maand      = $this->get('maand', date('Y-m'));
-        [$jaar, $mnr] = explode('-', $maand . '-01');
-
-        $dateFrom = "$jaar-$mnr-01";
-        $dateTo   = date('Y-m-t', strtotime($dateFrom));
+        [$dateFrom, $dateTo, $jaar, $mnr] = $this->periode($maand);
 
         $customer = Database::fetchOne("SELECT * FROM customers WHERE id=?", [$customerId]);
         if (!$customer) redirect('?page=gesprekspecificaties');
 
-        $calls        = $this->fetchCalls($customer, $dateFrom, $dateTo);
-        $perCategorie = $this->groepeerOpCategorie($calls);
-        $maandLabel   = $this->maandNaam($mnr) . ' ' . $jaar;
+        $calls = $this->fetchCalls($customer, $dateFrom, $dateTo);
+        $spec  = self::bouwSpecificatie($calls);
 
         $company = [
             'name'    => getSetting('company_name',    'Pantronic IT'),
             'address' => getSetting('company_address', 'Bobinestraat 7-17, 3903 KE Veenendaal'),
             'phone'   => getSetting('company_phone',   '0318-478226'),
             'email'   => getSetting('company_email',   'welkom@pantronic.nl'),
-            'vat'     => getSetting('company_vat',     ''),
         ];
 
         require_once APP_ROOT . '/includes/GesprekPDF.php';
-        GesprekPDF::download($customer, $company, $maandLabel, $perCategorie, $this->weergave());
-    }
-
-    /** 'nummer' (standaard, samengevoegd per bestemming) of 'gesprek' (elk gesprek los). */
-    private function weergave(): string
-    {
-        return $this->get('weergave', 'nummer') === 'gesprek' ? 'gesprek' : 'nummer';
+        GesprekPDF::download(
+            $customer['company_name'] ?: $customer['contact_name'],
+            $this->maandNaam($mnr) . ' ' . $jaar,
+            $spec,
+            $company
+        );
     }
 
     // ================================================================
-    // Hulpfuncties
+    // Berekening
+    // ================================================================
+
+    /**
+     * Bouwt de complete specificatie:
+     *  - categorieen : alle 6 categorieën (ook lege), met aantal / minuten / kosten
+     *  - nummers     : per bestemmingsnummer samengevoegd, gesorteerd op categorie en kosten
+     *  - totaal      : aantal / minuten / sec / kosten
+     *  - zonder_tarief : nummers waarvoor geen tarief gevonden is
+     */
+    public static function bouwSpecificatie(array $calls): array
+    {
+        $cats = [];
+        foreach (self::CATEGORIEEN as $cat) {
+            $cats[$cat] = ['aantal' => 0, 'minuten' => 0, 'sec' => 0, 'e4' => 0];
+        }
+
+        $nummers = [];
+        $zonder  = [];
+
+        foreach ($calls as $c) {
+            $cat = $c['categorie'];
+            $cats[$cat]['aantal']  += 1;
+            $cats[$cat]['minuten'] += $c['minuten'];
+            $cats[$cat]['sec']     += (int)$c['billsec'];
+            $cats[$cat]['e4']      += $c['kosten_e4'];
+
+            $key = $c['nummer'];
+            if (!isset($nummers[$key])) {
+                $nummers[$key] = [
+                    'nummer'        => self::toonNummer($key),
+                    'categorie'     => $cat,
+                    'land'          => $c['land'],
+                    'tarief'        => $c['tarief'],
+                    'tarief_bekend' => $c['tarief_bekend'],
+                    'toestellen'    => [],
+                    'aantal'        => 0,
+                    'minuten'       => 0,
+                    'sec'           => 0,
+                    'e4'            => 0,
+                ];
+            }
+            $n = &$nummers[$key];
+            $n['aantal']  += 1;
+            $n['minuten'] += $c['minuten'];
+            $n['sec']     += (int)$c['billsec'];
+            $n['e4']      += $c['kosten_e4'];
+            $n['toestellen'][$c['src']] = true;
+            unset($n);
+
+            if (!$c['tarief_bekend']) {
+                $zonder[$key] = ($zonder[$key] ?? 0) + 1;
+            }
+        }
+
+        foreach ($cats as &$g) {
+            $g['kosten'] = $g['e4'] / 10000;
+        }
+        unset($g);
+
+        $volgorde = array_flip(self::CATEGORIEEN);
+        foreach ($nummers as &$n) {
+            $n['kosten']     = $n['e4'] / 10000;
+            $n['toestellen'] = array_keys($n['toestellen']);
+            sort($n['toestellen'], SORT_NATURAL);
+        }
+        unset($n);
+        uasort($nummers, fn($a, $b) =>
+            [$volgorde[$a['categorie']], $b['e4'], $b['aantal'], $a['nummer']]
+            <=> [$volgorde[$b['categorie']], $a['e4'], $a['aantal'], $b['nummer']]
+        );
+
+        $totE4 = array_sum(array_column($cats, 'e4'));
+
+        return [
+            'categorieen'   => $cats,
+            'nummers'       => array_values($nummers),
+            'zonder_tarief' => $zonder,
+            'totaal'        => [
+                'aantal'  => array_sum(array_column($cats, 'aantal')),
+                'minuten' => array_sum(array_column($cats, 'minuten')),
+                'sec'     => array_sum(array_column($cats, 'sec')),
+                'kosten'  => $totE4 / 10000,
+            ],
+        ];
+    }
+
+    /** Kosten van één gesprek volgens cdr.pantronic.nl. */
+    public static function berekenGesprek(string $dst, int $billsec, array $instellingen, array $tarieven): array
+    {
+        $norm    = self::normaliseerNummer($dst);
+        $cat     = self::categoriseer($dst);
+        $minuten = (int)ceil($billsec / 60);
+        $start   = $instellingen['start'];
+        $land    = '';
+        $bekend  = true;
+
+        switch ($cat) {
+            case '0800 Gratis':
+                $tarief = 0.0;
+                $start  = 0.0;
+                break;
+            case 'Nationaal':
+            case '088 Nummer':
+                $tarief = $instellingen['nationaal'];
+                break;
+            case 'Mobiel':
+                $tarief = $instellingen['mobiel'];
+                break;
+            default: // Internationaal, 0900 Premium
+                [$tarief, $land] = self::zoekTarief($norm, $tarieven);
+                if ($tarief === null) {
+                    $bekend = false;
+                    $tarief = 0.0;
+                    $start  = 0.0;
+                }
+        }
+
+        $kosten = round($start + $minuten * $tarief, 4);
+
+        return [
+            'nummer'        => $norm,
+            'categorie'     => $cat,
+            'minuten'       => $minuten,
+            'tarief'        => $tarief,
+            'land'          => $land,
+            'tarief_bekend' => $bekend,
+            'kosten'        => $kosten,
+            'kosten_e4'     => (int)round($kosten * 10000),
+        ];
+    }
+
+    /** Prefix-lookup 4 -> 3 -> 2 cijfers (zoals cdr.pantronic.nl). */
+    public static function zoekTarief(string $norm, array $tarieven): array
+    {
+        foreach ([4, 3, 2] as $len) {
+            $pfx = substr($norm, 0, $len);
+            if (isset($tarieven[$pfx])) {
+                return [(float)$tarieven[$pfx]['tarief'], trim($tarieven[$pfx]['land'] . ' ' . $tarieven[$pfx]['regio'])];
+            }
+        }
+        return [null, ''];
+    }
+
+    private static function laadTarieven(): array
+    {
+        if (self::$tarieven !== null) return self::$tarieven;
+        self::$tarieven = [];
+        try {
+            foreach (Database::fetchAll("SELECT prefix, tarief, land, regio FROM bel_tarieven") as $r) {
+                self::$tarieven[$r['prefix']] = $r;
+            }
+        } catch (Exception $e) {
+            // tabel bestaat nog niet: migrate_bel_tarieven.sql uitvoeren
+        }
+        return self::$tarieven;
+    }
+
+    private function tariefInstellingen(): array
+    {
+        $f = fn($k, $d) => (float)str_replace(',', '.', (string)getSetting($k, $d));
+        return [
+            'start'     => $f('billing_starttarief',      '0.065'),
+            'nationaal' => $f('billing_tarief_nationaal', '0.025'),
+            'mobiel'    => $f('billing_tarief_mobiel',    '0.065'),
+        ];
+    }
+
+    private static function somKosten(array $calls): float
+    {
+        return array_sum(array_column($calls, 'kosten_e4')) / 10000;
+    }
+
+    // ================================================================
+    // Data
     // ================================================================
 
     private function extensiesVanKlant(array $customer): array
@@ -195,110 +344,32 @@ class GesprekspecificatiesController extends BaseController
 
         $ph   = implode(',', array_fill(0, count($exts), '?'));
         $rows = Database::fetchAll(
-            "SELECT calldate, src, dst, billsec,
-                    COALESCE(cost, 0) AS cost,
-                    destination_name
+            "SELECT calldate, src, dst, billsec
              FROM cdr_records
              WHERE src IN ($ph)
                AND DATE(calldate) BETWEEN ? AND ?
                AND disposition = 'ANSWERED'
                AND billsec > 0
+               AND LENGTH(REGEXP_REPLACE(dst, '[^0-9]', '')) > 3
              ORDER BY calldate",
             [...$exts, $dateFrom, $dateTo]
         );
 
-        // Voeg categorie toe aan elk gesprek
+        $inst     = $this->tariefInstellingen();
+        $tarieven = self::laadTarieven();
         foreach ($rows as &$r) {
-            $r['categorie'] = self::categoriseer($r['dst']);
+            $r += self::berekenGesprek($r['dst'], (int)$r['billsec'], $inst, $tarieven);
         }
+        unset($r);
 
         return $rows;
     }
 
-    /**
-     * Groepeert gesprekken per categorie en daarbinnen per bestemmingsnummer.
-     *
-     * Berekening:
-     *  - Kosten worden per gesprek berekend door applyRatesToCDR() (tariefstap +
-     *    starttarief per gesprek) en hier alleen opgeteld. Nooit opnieuw berekenen
-     *    vanuit totale duur x tarief: dat geeft een ander (te laag) bedrag.
-     *  - Optellen gebeurt in hele 1/10.000 euro (cost is DECIMAL(10,4)), zodat er
-     *    geen float-afwijkingen ontstaan. Afronding naar centen pas bij weergave.
-     *  - Nummers worden genormaliseerd (0612.., 0031612.., +31612.. = één regel).
-     */
-    private function groepeerOpCategorie(array $calls): array
-    {
-        $leeg = fn() => ['calls' => [], 'nummers' => [], 'aantal' => 0, 'sec' => 0, 'kosten_e4' => 0];
+    // ================================================================
+    // Nummers
+    // ================================================================
 
-        $groepen = [];
-        foreach (self::CATEGORIEEN as $cat) {
-            $groepen[$cat] = $leeg();
-        }
-
-        foreach ($calls as $c) {
-            $cat = $c['categorie'];
-            if (!isset($groepen[$cat])) {
-                $groepen[$cat] = $leeg();
-            }
-            $sec = (int)$c['billsec'];
-            $e4  = (int)round((float)$c['cost'] * 10000);
-
-            $groepen[$cat]['calls'][]    = $c;
-            $groepen[$cat]['aantal']    += 1;
-            $groepen[$cat]['sec']       += $sec;
-            $groepen[$cat]['kosten_e4'] += $e4;
-
-            // ---- per nummer ----
-            $key = self::normaliseerNummer($c['dst']);
-            $n   = &$groepen[$cat]['nummers'][$key];
-            if ($n === null) {
-                $n = [
-                    'nummer'           => self::toonNummer($key),
-                    'destination_name' => $c['destination_name'] ?? '',
-                    'toestellen'       => [],
-                    'aantal'           => 0,
-                    'sec'              => 0,
-                    'kosten_e4'        => 0,
-                    'eerste'           => $c['calldate'],
-                    'laatste'          => $c['calldate'],
-                ];
-            }
-            $n['aantal']    += 1;
-            $n['sec']       += $sec;
-            $n['kosten_e4'] += $e4;
-            $n['toestellen'][$c['src']] = true;
-            if ($c['calldate'] < $n['eerste'])  $n['eerste']  = $c['calldate'];
-            if ($c['calldate'] > $n['laatste']) $n['laatste'] = $c['calldate'];
-            if ($n['destination_name'] === '' && !empty($c['destination_name'])) {
-                $n['destination_name'] = $c['destination_name'];
-            }
-            unset($n);
-        }
-
-        // Verwijder lege categorieën
-        $groepen = array_filter($groepen, fn($g) => $g['aantal'] > 0);
-
-        // Afronden + sorteren (hoogste kosten eerst, dan meeste gesprekken, dan nummer)
-        foreach ($groepen as &$g) {
-            $g['kosten'] = $g['kosten_e4'] / 10000;
-            foreach ($g['nummers'] as &$n) {
-                $n['kosten']     = $n['kosten_e4'] / 10000;
-                $n['gem_sec']    = $n['aantal'] > 0 ? (int)round($n['sec'] / $n['aantal']) : 0;
-                $n['toestellen'] = array_keys($n['toestellen']);
-                sort($n['toestellen'], SORT_NATURAL);
-            }
-            unset($n);
-            uasort($g['nummers'], fn($a, $b) =>
-                [$b['kosten_e4'], $b['aantal'], $a['nummer']] <=> [$a['kosten_e4'], $a['aantal'], $b['nummer']]
-            );
-            $g['aantal_nummers'] = count($g['nummers']);
-        }
-        unset($g);
-
-        return $groepen;
-    }
-
-    /** Sleutel voor groepering: internationaal formaat zonder + of 00 (bijv. 31612345678). */
+    /** Internationaal formaat zonder + of 00 (0612.., +31612.., 0031612.. -> 31612..). */
     public static function normaliseerNummer(string $dst): string
     {
         $n = preg_replace('/\D/', '', $dst);
@@ -307,39 +378,37 @@ class GesprekspecificatiesController extends BaseController
         return $n;
     }
 
-    /** Weergave: NL-nummers nationaal (0612345678), buitenland met + (+441234567890). */
+    /** Weergave: NL nationaal (0612345678), buitenland met + (+442071234567). */
     public static function toonNummer(string $norm): string
     {
         if (str_starts_with($norm, '31') && strlen($norm) > 4) return '0' . substr($norm, 2);
         return strlen($norm) > 6 ? '+' . $norm : $norm;
     }
 
-    /** Totale kosten over alle categorieën, exact (zelfde basis als factuur). */
-    public static function totaalKosten(array $perCategorie): float
-    {
-        return array_sum(array_column($perCategorie, 'kosten_e4')) / 10000;
-    }
-
     public static function categoriseer(string $dst): string
     {
-        $n = preg_replace('/\D/', '', $dst);
+        $norm = self::normaliseerNummer($dst);
 
-        // Normaliseer naar internationaal formaat
-        if (str_starts_with($n, '00')) {
-            $norm = substr($n, 2);
-        } elseif (str_starts_with($n, '0') && strlen($n) > 1) {
-            $norm = '31' . substr($n, 1);
-        } else {
-            $norm = $n;
-        }
-
-        if (str_starts_with($norm, '310800') || str_starts_with($n, '0800')) return '0800 Gratis';
-        if (str_starts_with($norm, '310900') || str_starts_with($n, '0900')) return '0900 Premium';
-        if (str_starts_with($norm, '31088')  || str_starts_with($n, '088'))  return '088 Nummer';
-        if (str_starts_with($norm, '316'))                                    return 'Mobiel';
-        if (str_starts_with($norm, '31') && strlen($norm) >= 5)              return 'Nationaal';
+        if (str_starts_with($norm, '31800')) return '0800 Gratis';
+        if (str_starts_with($norm, '31900')) return '0900 Premium';
+        if (str_starts_with($norm, '3188'))  return '088 Nummer';
+        if (str_starts_with($norm, '316'))   return 'Mobiel';
+        if (str_starts_with($norm, '31') && strlen($norm) >= 5) return 'Nationaal';
 
         return 'Internationaal';
+    }
+
+    // ================================================================
+    // Overig
+    // ================================================================
+
+    private function periode(string $maand): array
+    {
+        if (!preg_match('/^(\d{4})-(\d{2})$/', $maand, $m)) {
+            $m = [null, date('Y'), date('m')];
+        }
+        $dateFrom = "{$m[1]}-{$m[2]}-01";
+        return [$dateFrom, date('Y-m-t', strtotime($dateFrom)), $m[1], $m[2]];
     }
 
     private function maandNaam(string $mnr): string
