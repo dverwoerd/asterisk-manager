@@ -110,14 +110,15 @@ class CDRController extends BaseController
         rewind($h);
 
         $alias = [
-            'calldate' => ['calldate','date','datum','start','starttime','datum/tijd','date/time','datetime'],
+            'calldate' => ['calldate','date','datum','start','starttime','datum/tijd','date/time','datetime','call time'],
             'src'      => ['src','source','from','van','bron','caller','toestel'],
             'dst'      => ['dst','destination','to','naar','bestemming','called','nummer'],
-            'billsec'  => ['billsec','billable','billable sec','gespreksduur','seconds','sec','duur'],
+            'billsec'  => ['billsec','billable','billable sec','gespreksduur','seconds','sec','duur','talking'],
             'duration' => ['duration','totale duur','total'],
             'disposition' => ['disposition','status','result','resultaat'],
             'clid'     => ['clid','callerid'],
-            'uniqueid' => ['uniqueid','id','callid'],
+            'uniqueid' => ['uniqueid','id','callid','call id'],
+            'ringing'  => ['ringing'], 'direction' => ['direction'], 'details' => ['call activity details'],
             'channel'  => ['channel'], 'dstchannel' => ['dstchannel'], 'dcontext' => ['dcontext'],
             'lastapp'  => ['lastapp'], 'lastdata' => ['lastdata'], 'accountcode' => ['accountcode'], 'userfield' => ['userfield'],
         ];
@@ -148,27 +149,37 @@ class CDRController extends BaseController
             }
 
             $g = fn($k) => isset($map[$k], $row[$map[$k]]) ? $row[$map[$k]] : '';
+            $is3cx = isset($map['ringing'], $map['direction']);            // export met Call Time / Talking / Direction
+            $toestel = fn(string $v) => preg_match('/\((\d{2,})\)\s*$/', $v, $mm) ? $mm[1] : $v;
             $datum = self::parseDatum($g('calldate'));
-            $dst   = $g('dst');
+            $dst   = $is3cx ? $toestel($g('dst')) : $g('dst');
             if ($datum === null || $dst === '') { $fout++; continue; }
 
             $billsec  = self::parseSeconden($g('billsec'));
             $duration = isset($map['duration']) ? self::parseSeconden($g('duration')) : $billsec;
-            $src      = $g('src');
+            if ($is3cx) $duration = $billsec + self::parseSeconden($g('ringing'));
+            $src      = $is3cx ? $toestel($g('src')) : $g('src');
+            $clid     = $is3cx ? $g('src') : $g('clid');
+            $dctx     = $is3cx ? $g('direction') : $g('dcontext');
+            $uf       = $is3cx ? mb_substr($g('details'), 0, 255) : $g('userfield');
             $disp     = strtoupper($g('disposition'));
             if (!in_array($disp, ['ANSWERED','NO ANSWER','FAILED','BUSY','CONGESTION'], true)) {
                 $disp = $billsec > 0 ? 'ANSWERED' : 'NO ANSWER';
             }
             $uid = $g('uniqueid');
-            if ($uid === '') $uid = 'csv-' . md5($datum . '|' . $src . '|' . $dst . '|' . $billsec);
+            // uniqueid is 32 tekens; een Call ID kan meerdere regels hebben (wachtrij, voicemail, doorgeschakeld)
+            if ($is3cx || $uid === '' || strlen($uid) > 32) {
+                $uid = md5($uid . '|' . $datum . '|' . $g('src') . '|' . $g('dst') . '|' . $g('disposition') . '|' . $billsec);
+            }
 
             $stmt = Database::query(
                 "INSERT IGNORE INTO cdr_records
                  (calldate, clid, src, dst, dcontext, channel, dstchannel, lastapp, lastdata,
                   duration, billsec, disposition, amaflags, accountcode, uniqueid, userfield)
                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?)",
-                [$datum, $g('clid'), $src, $dst, $g('dcontext'), $g('channel'), $g('dstchannel'),
-                 $g('lastapp'), $g('lastdata'), $duration, $billsec, $disp, $g('accountcode'), $uid, $g('userfield')]);
+                [$datum, mb_substr($clid, 0, 80), mb_substr($src, 0, 80), mb_substr($dst, 0, 80), mb_substr($dctx, 0, 80),
+                 $g('channel'), $g('dstchannel'), $g('lastapp'), $g('lastdata'),
+                 $duration, $billsec, $disp, $g('accountcode'), $uid, $uf]);
             if ($stmt->rowCount() > 0) $nieuw++; else $dubbel++;
         }
         fclose($h);
@@ -178,7 +189,7 @@ class CDRController extends BaseController
     private static function parseDatum(string $s): ?string
     {
         if ($s === '') return null;
-        foreach (['Y-m-d H:i:s','Y-m-d H:i','d-m-Y H:i:s','d-m-Y H:i','d/m/Y H:i:s','d/m/Y H:i','Y/m/d H:i:s'] as $fmt) {
+        foreach (['Y-m-d\TH:i:s','Y-m-d\TH:i','Y-m-d H:i:s','Y-m-d H:i','d-m-Y H:i:s','d-m-Y H:i','d/m/Y H:i:s','d/m/Y H:i','Y/m/d H:i:s'] as $fmt) {
             $d = DateTime::createFromFormat($fmt, $s);
             if ($d && $d->format($fmt) === $s) return $d->format('Y-m-d H:i:s');
         }
