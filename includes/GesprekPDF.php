@@ -1,45 +1,31 @@
 <?php
 // ============================================================
-// GesprekPDF — Pantronic Gespreksspecificatie PDF via mPDF
+// GesprekPDF: Gespreksspecificatie-PDF via mPDF (1 pagina per klant en maand)
 //
+// Opzet:
+//   - blauwe kop met bedrijfsnaam, oranje balk "Gespreksspecificaties"
+//   - Klant / Periode
+//   - samenvatting: alle zes categorieen (ook met 0 gesprekken), totaalrij
+//   - "Specificatie per nummer": nummer, bestemming (categorie + toestel), aantal, minuten, totaal
+//   - voettekst met bedrijfsgegevens
 // Pantronic huisstijl: blauw #1B3A6B, oranje #F37021
-// Blokstructuur: header (blauw), oranje balk, klant/periode info,
-// samenvatting per categorie, detail per categorie, voettekst met bedrijfsgegevens.
-// Categorieën kleurgecodeerd (6 kleuren).
-// Detail: gesprekken gegroepeerd per nummer; kolommen per gesprek:
-// datum, tijd, toestel, bestemming, duur, kosten (4 decimalen).
 // ============================================================
 
 class GesprekPDF
 {
     const BLAUW      = '#1B3A6B';
     const ORANJE     = '#F37021';
-    const LICHTBLAUW = '#EEF2FA';
-    const GRIJS      = '#F4F6FA';
-
-    const CAT_KLEUREN = [
-        'Nationaal'      => '#1B3A6B',
-        'Mobiel'         => '#2A5298',
-        '088 Nummer'     => '#3D7ABF',
-        'Internationaal' => '#C9571A',
-        '0800 Gratis'    => '#27AE60',
-        '0900 Premium'   => '#E74C3C',
-    ];
+    const LICHTBLAUW = '#E8EDF5';
+    const RAND       = '#D0D7E2';
 
     public static function download(array $customer, array $company, string $maandLabel, array $spec): void
     {
-        $autoload = APP_ROOT . '/vendor/autoload.php';
-        if (!file_exists($autoload)) {
-            throw new Exception('mPDF niet geïnstalleerd. Voer uit: composer require mpdf/mpdf');
-        }
-        require_once $autoload;
-
         $mpdf = self::maak($customer, $company, $maandLabel, $spec);
 
-        $klantnaam = $customer['company_name'] ?: $customer['contact_name'];
-        $bestandsnaam = 'gespreksspecificatie-'
-            . preg_replace('/[^a-z0-9]/i', '-', $klantnaam) . '-'
-            . str_replace(' ', '-', strtolower($maandLabel)) . '.pdf';
+        // J.J.A. Smidts + November 2026  ->  J_J_A__Smidts_November_2026.pdf
+        $klantnaam    = $customer['company_name'] ?: $customer['contact_name'];
+        $bestandsnaam = preg_replace('/[^A-Za-z0-9]/', '_', $klantnaam) . '_'
+                      . preg_replace('/[^A-Za-z0-9]/', '_', $maandLabel) . '.pdf';
 
         $mpdf->Output($bestandsnaam, 'D');
         exit;
@@ -47,33 +33,35 @@ class GesprekPDF
 
     public static function maak(array $customer, array $company, string $maandLabel, array $spec): \Mpdf\Mpdf
     {
+        $autoload = APP_ROOT . '/vendor/autoload.php';
+        if (!file_exists($autoload)) {
+            throw new Exception('mPDF niet geinstalleerd. Voer uit: composer require mpdf/mpdf');
+        }
+        require_once $autoload;
+
         $mpdf = new \Mpdf\Mpdf([
             'mode'              => 'utf-8',
             'format'            => 'A4',
             'margin_top'        => 0,
-            'margin_bottom'     => 18,
-            'margin_footer'     => 6,
+            'margin_bottom'     => 22,
+            'margin_footer'     => 8,
             'margin_left'       => 0,
             'margin_right'      => 0,
             'default_font'      => 'dejavusans',
-            'default_font_size' => 9,
+            'default_font_size' => 9.5,
         ]);
 
         $klantnaam = $customer['company_name'] ?: $customer['contact_name'];
-        $mpdf->SetTitle("Gespreksspecificatie $klantnaam — $maandLabel");
+        $mpdf->SetTitle("Gespreksspecificaties $klantnaam - $maandLabel");
         $mpdf->SetAuthor($company['name']);
-        $mpdf->SetCreator('Pantronic Asterisk Manager');
+        $mpdf->SetCreator('Asterisk Manager');
 
-        // Voettekst met bedrijfsgegevens op elke pagina
         $mpdf->SetHTMLFooter(
-            '<table width="100%" style="border-top:2px solid ' . self::BLAUW . ';font-size:7.5pt;color:#64748b">'
-            . '<tr><td style="padding:6px 24px 0;text-align:center">'
-            . '<strong style="color:' . self::BLAUW . '">' . htmlspecialchars($company['name']) . '</strong>'
-            . ' &nbsp;&bull;&nbsp; ' . htmlspecialchars($company['address'])
-            . ' &nbsp;&bull;&nbsp; Tel. ' . htmlspecialchars($company['phone'])
-            . ' &nbsp;&bull;&nbsp; ' . htmlspecialchars($company['email'])
-            . ' &nbsp;&bull;&nbsp; Pagina {PAGENO} van {nbpg}'
-            . '</td></tr></table>'
+            '<div style="text-align:center;font-size:7.5pt;color:#9aa3b2">'
+            . htmlspecialchars($company['name'])
+            . ' &nbsp;&middot;&nbsp; ' . htmlspecialchars($company['address'])
+            . ' &nbsp;&middot;&nbsp; Tel. ' . htmlspecialchars($company['phone'])
+            . '</div>'
         );
 
         $mpdf->WriteHTML(self::buildHTML($customer, $company, $maandLabel, $spec));
@@ -82,180 +70,104 @@ class GesprekPDF
 
     private static function buildHTML(array $customer, array $company, string $maandLabel, array $spec): string
     {
-        $klantnaam = htmlspecialchars($customer['company_name'] ?: $customer['contact_name']);
         $blauw  = self::BLAUW;
         $oranje = self::ORANJE;
+        $klant  = htmlspecialchars($customer['company_name'] ?: $customer['contact_name']);
         $t      = $spec['totaal'];
-        $totE4  = (int)round($t['kosten'] * 10000);
 
         $css = "
-        body { font-family: dejavusans; font-size: 9pt; color: #1a1a1a; }
+        body { font-family: dejavusans; color: #222; }
         table { border-collapse: collapse; }
-
-        .header { background: $blauw; color: #fff; padding: 18px 24px 14px; }
-        .header-title { font-size: 18pt; font-weight: bold; color: #fff; }
-        .header-sub { font-size: 9.5pt; color: #C5D0E3; margin-top: 2px; }
-        .orange-bar { background: $oranje; height: 4px; font-size: 1pt; line-height: 1pt; }
-
-        .info { width: 100%; border-bottom: 1px solid #E2E8F0; }
-        .info td { padding: 14px 24px; vertical-align: top; width: 50%; }
-        .info-label { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; }
-        .info-value { font-size: 11pt; font-weight: bold; color: $blauw; }
-        .info-sub { font-size: 8.5pt; color: #64748b; }
-
-        .section { padding: 12px 24px 0; }
-        .section-title { font-size: 8pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
-                         color: $oranje; border-bottom: 2px solid $oranje; padding-bottom: 4px; margin-bottom: 8px; }
-
-        .tbl { width: 100%; }
-        .tbl th { color: #fff; padding: 6px 10px; font-size: 8pt; font-weight: bold; text-align: left; }
-        .tbl td { padding: 5px 10px; border-bottom: 1px solid #E2E8F0; font-size: 8.5pt; }
+        .kop     { background: $blauw; color: #ffffff; text-align: center; font-size: 20pt; font-weight: bold; padding: 22px 0 20px; }
+        .balk    { background: $oranje; color: #ffffff; text-align: center; font-size: 13pt; font-weight: bold; padding: 12px 0; }
+        .inhoud  { padding: 0 20mm; }
+        .info td { padding: 3px 0; font-size: 10pt; }
+        .info .l { width: 22mm; color: #444; }
+        h2       { color: $blauw; font-size: 11.5pt; margin: 22px 0 8px; }
+        .tbl     { width: 100%; border: 1px solid " . self::RAND . "; }
+        .tbl th  { background: $blauw; color: #ffffff; font-size: 8.5pt; font-weight: bold; padding: 9px 8px; }
+        .tbl td  { padding: 9px 8px; font-size: 9pt; }
         .tbl tr.alt td { background: " . self::LICHTBLAUW . "; }
-        .tbl .r { text-align: right; }
-        .tbl tr.totaal td { background: $oranje; color: #fff; font-weight: bold; padding: 6px 10px; border: none; }
-
-        .det th { padding: 4px 8px; font-size: 7.5pt; }
-        .det td { padding: 3px 8px; font-size: 8pt; }
-        .det tr.alt td { background: " . self::GRIJS . "; }
-        .det tr.nummer td { background: #E6ECF5; font-weight: bold; color: $blauw; padding: 5px 8px; border-bottom: 1px solid #CBD5E1; }
-        .det tr.sub td { background: $blauw; color: #fff; font-weight: bold; padding: 4px 8px; border: none; }
-        .mono { font-family: dejavusansmono; }
-        .muted { color: #94a3b8; font-size: 7.5pt; font-weight: normal; }
+        .tbl tr.totaal td { background: $oranje; color: #ffffff; font-weight: bold; }
+        .c { text-align: center; } .r { text-align: right; } .lnk { text-align: left; }
+        .klein { font-size: 7pt; color: #8a93a3; }
+        .groot td { padding: 13px 14px; font-size: 9.5pt; }
         ";
 
-        // ---- Samenvatting per categorie (alleen categorieën met gesprekken) ----
+        // ---- Samenvatting: alle categorieen ----
         $rijen = '';
         $i = 0;
         foreach ($spec['categorieen'] as $cat => $g) {
-            if ($g['aantal'] === 0) continue;
-            $kleur = self::CAT_KLEUREN[$cat] ?? $blauw;
             $rijen .= '<tr' . ($i++ % 2 ? ' class="alt"' : '') . '>'
-                . '<td><span style="background:' . $kleur . ';color:#ffffff;font-weight:bold;font-size:7.5pt">&nbsp;'
-                . htmlspecialchars($cat) . '&nbsp;</span></td>'
-                . '<td class="r">' . number_format($g['aantal'], 0, ',', '.') . '</td>'
-                . '<td class="r">' . self::formatDur($g['sec']) . '</td>'
-                . '<td class="r"><strong>' . self::euro($g['kosten']) . '</strong></td>'
-                . '<td class="r">' . ($totE4 > 0 ? number_format($g['e4'] / $totE4 * 100, 1, ',', '.') : '0') . '%</td>'
+                . '<td class="lnk">' . htmlspecialchars($cat) . '</td>'
+                . '<td class="c">' . (int)$g['aantal'] . '</td>'
+                . '<td class="c">' . (int)$g['minuten'] . '</td>'
+                . '<td class="r">' . self::euro($g['kosten']) . '</td>'
                 . '</tr>';
         }
         $samenvatting = '
-        <div class="section">
-            <div class="section-title">Samenvatting per categorie</div>
-            <table class="tbl">
-                <thead><tr>
-                    <th style="background:' . $blauw . '">Categorie</th>
-                    <th class="r" style="background:' . $blauw . '">Gesprekken</th>
-                    <th class="r" style="background:' . $blauw . '">Duur</th>
-                    <th class="r" style="background:' . $blauw . '">Kosten</th>
-                    <th class="r" style="background:' . $blauw . '">% van totaal</th>
-                </tr></thead>
-                <tbody>' . $rijen . '</tbody>
-                <tfoot><tr class="totaal">
-                    <td>Totaal</td>
-                    <td class="r">' . number_format($t['aantal'], 0, ',', '.') . '</td>
-                    <td class="r">' . self::formatDur($t['sec']) . '</td>
-                    <td class="r">' . self::euro($t['kosten']) . '</td>
-                    <td class="r">100%</td>
-                </tr></tfoot>
-            </table>
-        </div>';
+        <table class="tbl groot">
+            <thead><tr>
+                <th class="c">Categorie</th><th class="c">Aantal gesprekken</th>
+                <th class="c">Minuten</th><th class="r">Totaal (&euro;)</th>
+            </tr></thead>
+            <tbody>' . $rijen . '
+                <tr class="totaal"><td class="lnk">Totaal</td><td></td><td></td>
+                    <td class="r">' . self::euro($t['kosten']) . '</td></tr>
+            </tbody>
+        </table>';
 
-        // ---- Detail per categorie, gesprekken gegroepeerd per nummer ----
-        $detail = '';
-        foreach ($spec['categorieen'] as $cat => $g) {
-            if ($g['aantal'] === 0) continue;
-            $kleur = self::CAT_KLEUREN[$cat] ?? $blauw;
-            $th = fn(string $txt, string $cls = '', string $w = '') =>
-                '<th' . ($cls ? " class=\"$cls\"" : '') . ' style="background:' . $kleur . ($w ? ";width:$w" : '') . '">' . $txt . '</th>';
+        // ---- Specificatie per nummer ----
+        $rijen = '';
+        $i = 0;
+        foreach ($spec['nummers'] as $n) {
+            $best = htmlspecialchars($n['categorie']);
+            if (!empty($n['land'])) $best .= ' &middot; ' . htmlspecialchars($n['land']);
+            $ts = $n['toestellen'] ?? [];
+            $toestel = $ts ? (count($ts) > 1 ? 'Toestellen ' : 'Toestel ') . htmlspecialchars(implode(', ', $ts)) : '';
 
-            $rijen = '';
-            foreach ($g['nummers'] as $n) {
-                $omschr = $n['land'] !== '' ? $n['land'] : $cat;
-                $rijen .= '<tr class="nummer">'
-                    . '<td colspan="4"><span class="mono">' . htmlspecialchars($n['nummer']) . '</span>'
-                    . ' <span class="muted">— ' . htmlspecialchars($omschr) . ' — ' . $n['aantal'] . ' gesprek' . ($n['aantal'] === 1 ? '' : 'ken') . '</span></td>'
-                    . '<td class="r">' . self::formatDur($n['sec']) . '</td>'
-                    . '<td class="r">' . self::euro4($n['kosten']) . '</td>'
-                    . '</tr>';
-                $j = 0;
-                foreach ($n['calls'] as $c) {
-                    $rijen .= '<tr' . ($j++ % 2 ? ' class="alt"' : '') . '>'
-                        . '<td class="mono">' . date('d-m-Y', strtotime($c['calldate'])) . '</td>'
-                        . '<td class="mono">' . date('H:i:s', strtotime($c['calldate'])) . '</td>'
-                        . '<td class="mono">' . htmlspecialchars($c['src']) . '</td>'
-                        . '<td class="mono">' . htmlspecialchars($c['dst']) . '</td>'
-                        . '<td class="r mono">' . self::formatDur((int)$c['billsec']) . '</td>'
-                        . '<td class="r mono">' . self::euro4($c['kosten']) . '</td>'
-                        . '</tr>';
-                }
-            }
-
-            $detail .= '
-            <div class="section">
-                <div class="section-title" style="border-color:' . $kleur . ';color:' . $kleur . '">'
-                    . htmlspecialchars($cat)
-                    . ' <span class="muted">' . count($g['nummers']) . ' nummers — ' . $g['aantal'] . ' gesprekken — '
-                    . self::formatDur($g['sec']) . ' — ' . self::euro($g['kosten']) . '</span>
-                </div>
-                <table class="tbl det">
-                    <thead><tr>'
-                    . $th('Datum', '', '15%') . $th('Tijd', '', '12%') . $th('Toestel', '', '12%')
-                    . $th('Bestemming') . $th('Duur', 'r', '12%') . $th('Kosten', 'r', '14%') .
-                    '</tr></thead>
-                    <tbody>' . $rijen . '</tbody>
-                    <tfoot><tr class="sub">
-                        <td colspan="4">Subtotaal ' . htmlspecialchars($cat) . '</td>
-                        <td class="r">' . self::formatDur($g['sec']) . '</td>
-                        <td class="r">' . self::euro($g['kosten']) . '</td>
-                    </tr></tfoot>
-                </table>
-            </div>';
+            $rijen .= '<tr' . ($i++ % 2 ? ' class="alt"' : '') . '>'
+                . '<td class="lnk">' . htmlspecialchars($n['nummer']) . '</td>'
+                . '<td class="lnk">' . $best . ($toestel ? '<br><span class="klein">' . $toestel . '</span>' : '') . '</td>'
+                . '<td class="c">' . (int)$n['aantal'] . '</td>'
+                . '<td class="c">' . (int)$n['minuten'] . '</td>'
+                . '<td class="r">' . self::euro($n['kosten']) . '</td>'
+                . '</tr>';
         }
+        if ($rijen === '') {
+            $rijen = '<tr><td colspan="5" class="c klein">Geen gesprekken in deze periode.</td></tr>';
+        }
+        $perNummer = '
+        <h2>Specificatie per nummer</h2>
+        <table class="tbl">
+            <thead><tr>
+                <th class="c" style="width:30mm">Nummer</th><th class="c">Bestemming</th>
+                <th class="c" style="width:18mm">Aantal</th><th class="c" style="width:18mm">Minuten</th>
+                <th class="r" style="width:24mm">Totaal (&euro;)</th>
+            </tr></thead>
+            <tbody>' . $rijen . '
+                <tr class="totaal"><td class="lnk">Totaal</td><td></td>
+                    <td class="c">' . (int)$t['aantal'] . '</td><td class="c">' . (int)$t['minuten'] . '</td>
+                    <td class="r">' . self::euro($t['kosten']) . '</td></tr>
+            </tbody>
+        </table>';
 
         return '<html><head><style>' . $css . '</style></head><body>
-
-<div class="header">
-    <div class="header-title">GESPREKSSPECIFICATIE</div>
-    <div class="header-sub">' . htmlspecialchars($company['name']) . ' &mdash; ' . htmlspecialchars($maandLabel) . '</div>
+<div class="kop">' . htmlspecialchars($company['name']) . '</div>
+<div class="balk">Gespreksspecificaties</div>
+<div class="inhoud">
+    <table class="info" style="margin-top:22px">
+        <tr><td class="l">Klant:</td><td>' . $klant . '</td></tr>
+        <tr><td class="l">Periode:</td><td>' . htmlspecialchars($maandLabel) . '</td></tr>
+    </table>
+    <div style="height:18px"></div>
+    ' . $samenvatting . $perNummer . '
 </div>
-<div class="orange-bar">&nbsp;</div>
-
-<table class="info"><tr>
-    <td>
-        <div class="info-label">Klant</div>
-        <div class="info-value">' . $klantnaam . '</div>
-        <div class="info-sub">' . htmlspecialchars($customer['contact_name'] ?? '') . '</div>
-    </td>
-    <td>
-        <div class="info-label">Periode</div>
-        <div class="info-value">' . htmlspecialchars($maandLabel) . '</div>
-        <div class="info-sub">Totaal: ' . number_format($t['aantal'], 0, ',', '.') . ' gesprekken &nbsp;&bull;&nbsp; '
-            . self::formatDur($t['sec']) . ' &nbsp;&bull;&nbsp; <strong style="color:' . $oranje . '">'
-            . self::euro($t['kosten']) . '</strong> excl. BTW</div>
-    </td>
-</tr></table>
-
-' . $samenvatting . $detail . '
-
 </body></html>';
     }
 
     private static function euro(float $v): string
     {
-        return '€ ' . number_format($v, 2, ',', '.');
-    }
-
-    private static function euro4(float $v): string
-    {
-        return '€ ' . number_format($v, 4, ',', '.');
-    }
-
-    private static function formatDur(int $sec): string
-    {
-        $h = intdiv($sec, 3600);
-        $m = intdiv($sec % 3600, 60);
-        $s = $sec % 60;
-        if ($h > 0) return sprintf('%d:%02d:%02d', $h, $m, $s);
-        return sprintf('%d:%02d', $m, $s);
+        return '&euro; ' . number_format($v, 2, ',', '.');
     }
 }
