@@ -40,15 +40,15 @@ class GesprekPDF
         require_once $autoload;
 
         $mpdf = new \Mpdf\Mpdf([
-            'mode'              => 'utf-8',
+            'mode'              => 'c',          // standaard PDF-lettertypen (Helvetica), niet ingebed
             'format'            => 'A4',
             'margin_top'        => 0,
             'margin_bottom'     => 22,
             'margin_footer'     => 8,
             'margin_left'       => 0,
             'margin_right'      => 0,
-            'default_font'      => 'dejavusans',
-            'default_font_size' => 9.5,
+            'default_font'      => 'helvetica',
+            'default_font_size' => 10,
         ]);
 
         $klantnaam = $customer['company_name'] ?: $customer['contact_name'];
@@ -57,7 +57,7 @@ class GesprekPDF
         $mpdf->SetCreator('Asterisk Manager');
 
         $mpdf->SetHTMLFooter(
-            '<div style="text-align:center;font-size:7.5pt;color:#9aa3b2">'
+            '<div style="text-align:center;font-family:helvetica;font-size:8pt;color:#9aa3b2">'
             . htmlspecialchars($company['name'])
             . ' &nbsp;&middot;&nbsp; ' . htmlspecialchars($company['address'])
             . ' &nbsp;&middot;&nbsp; Tel. ' . htmlspecialchars($company['phone'])
@@ -75,27 +75,32 @@ class GesprekPDF
         $klant  = htmlspecialchars($customer['company_name'] ?: $customer['contact_name']);
         $t      = $spec['totaal'];
 
+        $rand = self::RAND;
         $css = "
-        body { font-family: dejavusans; color: #222; }
+        body { font-family: helvetica; font-size: 10pt; color: #222222; }
         table { border-collapse: collapse; }
-        .kop     { background: $blauw; color: #ffffff; text-align: center; font-size: 20pt; font-weight: bold; padding: 22px 0 20px; }
-        .balk    { background: $oranje; color: #ffffff; text-align: center; font-size: 13pt; font-weight: bold; padding: 12px 0; }
-        .inhoud  { padding: 0 20mm; }
-        .info td { padding: 3px 0; font-size: 10pt; }
-        .info .l { width: 22mm; color: #444; }
-        h2       { color: $blauw; font-size: 11.5pt; margin: 22px 0 8px; }
-        .tbl     { width: 100%; border: 1px solid " . self::RAND . "; }
-        .tbl th  { background: $blauw; color: #ffffff; font-size: 8.5pt; font-weight: bold; padding: 9px 8px; }
-        .tbl td  { padding: 9px 8px; font-size: 9pt; }
+        .kop    { background: $blauw; color: #ffffff; text-align: center; font-size: 17pt; font-weight: bold;
+                  height: 45.3pt; padding-top: 22.4pt; }
+        .balk   { background: $oranje; color: #ffffff; text-align: center; font-size: 13pt; font-weight: bold;
+                  height: 27.5pt; padding-top: 9.8pt; }
+        .inhoud { padding: 0 39.7pt; }
+        .info td { padding: 4.85pt 0; font-size: 10pt; }
+        .info .l { width: 56.7pt; }
+        .tbl    { width: 100%; border: 0.75pt solid $rand; }
+        .tbl th { background: $blauw; color: #ffffff; font-weight: bold; text-align: center; }
         .tbl tr.alt td { background: " . self::LICHTBLAUW . "; }
         .tbl tr.totaal td { background: $oranje; color: #ffffff; font-weight: bold; }
-        .spec td { padding: 5px 8px; }
-        .spec tr.cat td, .spec tr.totaal td { padding: 7px 8px; }
-        .tbl tr.cat td { background: #D3DBEA; color: $blauw; font-weight: bold; }
-        .pagina2 { color: $blauw; font-size: 11.5pt; font-weight: bold; margin: 0 0 4px; }
         .c { text-align: center; } .r { text-align: right; } .lnk { text-align: left; }
-        .klein { font-size: 7pt; color: #8a93a3; }
-        .groot td { padding: 13px 14px; font-size: 9.5pt; }
+        .klein { font-size: 7.5pt; color: #8a93a3; font-weight: normal; }
+
+        .groot th { font-size: 10pt; height: 40.3pt; padding: 0 14pt; }
+        .groot td { font-size: 10pt; padding: 14.2pt 13.6pt 14.2pt 14pt; }
+
+        .spec th { font-size: 9pt; padding: 8pt 9pt; }
+        .spec td { font-size: 9pt; padding: 6pt 9pt; }
+        .spec tr.cat td { background: #D3DBEA; color: $blauw; font-weight: bold; padding: 7pt 9pt; }
+        .spec tr.totaal td { padding: 7pt 9pt; }
+        .pagina2 { color: $blauw; font-size: 11pt; font-weight: bold; margin: 0 0 3pt; }
         ";
 
         // ---- Samenvatting: alle categorieen ----
@@ -112,8 +117,8 @@ class GesprekPDF
         $samenvatting = '
         <table class="tbl groot">
             <thead><tr>
-                <th class="c">Categorie</th><th class="c">Aantal gesprekken</th>
-                <th class="c">Minuten</th><th class="r">Totaal (&euro;)</th>
+                <th style="width:176.6pt">Categorie</th><th style="width:143.6pt">Aantal gesprekken</th>
+                <th style="width:95.2pt">Minuten</th><th style="width:100.5pt">Totaal (&euro;)</th>
             </tr></thead>
             <tbody>' . $rijen . '
                 <tr class="totaal"><td class="lnk">Totaal</td><td></td><td></td>
@@ -153,9 +158,9 @@ class GesprekPDF
         $perNummer = '
         <table class="tbl spec">
             <thead><tr>
-                <th class="lnk" style="width:34mm">Nummer</th><th class="lnk">Bestemming</th>
-                <th class="c" style="width:18mm">Aantal</th><th class="c" style="width:18mm">Minuten</th>
-                <th class="r" style="width:24mm">Totaal (&euro;)</th>
+                <th style="width:101.7pt">Nummer</th><th style="width:222pt">Bestemming</th>
+                <th style="width:55pt">Aantal</th><th style="width:58.4pt">Minuten</th>
+                <th style="width:79pt">Totaal (&euro;)</th>
             </tr></thead>
             <tbody>' . $rijen . '
                 <tr class="totaal"><td class="lnk">Totaal</td><td></td>
@@ -168,11 +173,11 @@ class GesprekPDF
 <div class="kop">' . htmlspecialchars($company['name']) . '</div>
 <div class="balk">Gespreksspecificaties</div>
 <div class="inhoud">
-    <table class="info" style="margin-top:22px">
+    <table class="info" style="margin-top:20.6pt">
         <tr><td class="l">Klant:</td><td>' . $klant . '</td></tr>
         <tr><td class="l">Periode:</td><td>' . htmlspecialchars($maandLabel) . '</td></tr>
     </table>
-    <div style="height:18px"></div>
+    <div style="height:15.8pt"></div>
     ' . $samenvatting . '
 </div>
 
