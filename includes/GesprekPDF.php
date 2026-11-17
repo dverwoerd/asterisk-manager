@@ -89,6 +89,10 @@ class GesprekPDF
         .tbl td  { padding: 9px 8px; font-size: 9pt; }
         .tbl tr.alt td { background: " . self::LICHTBLAUW . "; }
         .tbl tr.totaal td { background: $oranje; color: #ffffff; font-weight: bold; }
+        .spec td { padding: 5px 8px; }
+        .spec tr.cat td, .spec tr.totaal td { padding: 7px 8px; }
+        .tbl tr.cat td { background: #D3DBEA; color: $blauw; font-weight: bold; }
+        .pagina2 { color: $blauw; font-size: 11.5pt; font-weight: bold; margin: 0 0 4px; }
         .c { text-align: center; } .r { text-align: right; } .lnk { text-align: left; }
         .klein { font-size: 7pt; color: #8a93a3; }
         .groot td { padding: 13px 14px; font-size: 9.5pt; }
@@ -117,18 +121,27 @@ class GesprekPDF
             </tbody>
         </table>';
 
-        // ---- Specificatie per nummer ----
+        // ---- Specificatie per nummer, gegroepeerd op categorie (pagina 2) ----
         $rijen = '';
+        $huidig = null;
         $i = 0;
         foreach ($spec['nummers'] as $n) {
-            $best = htmlspecialchars($n['categorie']);
-            if (!empty($n['land'])) $best .= ' &middot; ' . htmlspecialchars($n['land']);
+            if ($n['categorie'] !== $huidig) {
+                $huidig = $n['categorie'];
+                $g = $spec['categorieen'][$huidig];
+                $rijen .= '<tr class="cat"><td colspan="2" class="lnk">' . htmlspecialchars($huidig) . '</td>'
+                    . '<td class="c">' . (int)$g['aantal'] . '</td><td class="c">' . (int)$g['minuten'] . '</td>'
+                    . '<td class="r">' . self::euro($g['kosten']) . '</td></tr>';
+                $i = 0;
+            }
             $ts = $n['toestellen'] ?? [];
             $toestel = $ts ? (count($ts) > 1 ? 'Toestellen ' : 'Toestel ') . htmlspecialchars(implode(', ', $ts)) : '';
 
             $rijen .= '<tr' . ($i++ % 2 ? ' class="alt"' : '') . '>'
                 . '<td class="lnk">' . htmlspecialchars($n['nummer']) . '</td>'
-                . '<td class="lnk">' . $best . ($toestel ? '<br><span class="klein">' . $toestel . '</span>' : '') . '</td>'
+                . '<td class="lnk">' . (!empty($n['land'])
+                        ? htmlspecialchars($n['land']) . ($toestel ? '<br><span class="klein">' . $toestel . '</span>' : '')
+                        : '<span class="klein">' . $toestel . '</span>') . '</td>'
                 . '<td class="c">' . (int)$n['aantal'] . '</td>'
                 . '<td class="c">' . (int)$n['minuten'] . '</td>'
                 . '<td class="r">' . self::euro($n['kosten']) . '</td>'
@@ -138,10 +151,9 @@ class GesprekPDF
             $rijen = '<tr><td colspan="5" class="c klein">Geen gesprekken in deze periode.</td></tr>';
         }
         $perNummer = '
-        <h2>Specificatie per nummer</h2>
-        <table class="tbl">
+        <table class="tbl spec">
             <thead><tr>
-                <th class="c" style="width:30mm">Nummer</th><th class="c">Bestemming</th>
+                <th class="lnk" style="width:34mm">Nummer</th><th class="lnk">Bestemming</th>
                 <th class="c" style="width:18mm">Aantal</th><th class="c" style="width:18mm">Minuten</th>
                 <th class="r" style="width:24mm">Totaal (&euro;)</th>
             </tr></thead>
@@ -161,7 +173,15 @@ class GesprekPDF
         <tr><td class="l">Periode:</td><td>' . htmlspecialchars($maandLabel) . '</td></tr>
     </table>
     <div style="height:18px"></div>
-    ' . $samenvatting . $perNummer . '
+    ' . $samenvatting . '
+</div>
+
+<pagebreak margin-top="16mm" />
+
+<div class="inhoud">
+    <div class="pagina2">Specificatie per nummer</div>
+    <div class="klein" style="margin-bottom:10px">' . $klant . ' &middot; ' . htmlspecialchars($maandLabel) . ' &middot; gesorteerd op categorie</div>
+    ' . $perNummer . '
 </div>
 </body></html>';
     }
