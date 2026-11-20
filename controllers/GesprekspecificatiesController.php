@@ -404,6 +404,30 @@ class GesprekspecificatiesController extends BaseController
             [...$exts, $dateFrom, $dateTo]
         );
 
+        // Doorgeschakelde gesprekken: Asterisk boekt het doorgeschakelde been (Local/...) op de oorspronkelijke
+        // beller als src. Zo'n been hoort bij de klant van het toestel dat het gesprek doorschakelde: het
+        // toestel kreeg kort daarvoor (max 60 s) een inkomend gesprek van dezelfde beller zonder op te nemen.
+        $fwd = Database::fetchAll(
+            "SELECT f.calldate, o.dst AS src, f.dst, f.billsec
+             FROM cdr_records f
+             JOIN cdr_records o ON o.src = f.src
+                AND o.dst IN ($ph)
+                AND o.calldate BETWEEN f.calldate - INTERVAL 60 SECOND AND f.calldate
+                AND o.disposition <> 'ANSWERED'
+             WHERE f.channel LIKE 'Local/%'
+               AND f.src NOT IN ($ph)
+               AND DATE(f.calldate) BETWEEN ? AND ?
+               AND f.disposition = 'ANSWERED'
+               AND f.billsec > 0
+               AND LENGTH(REGEXP_REPLACE(f.dst, '[^0-9]', '')) > 3
+             GROUP BY f.uniqueid
+             ORDER BY f.calldate",
+            [...$exts, ...$exts, $dateFrom, $dateTo]
+        );
+        foreach ($fwd as &$f) { $f['doorgeschakeld'] = true; }
+        unset($f);
+        $rows = array_merge($rows, $fwd);
+
         // Asterisk-CDR en geimporteerde CSV-records staan in dezelfde tabel. Overlappen ze (zelfde toestel,
         // nummer en starttijd), dan telt dat gesprek maar een keer.
         $rows = $this->ontdubbel($rows);

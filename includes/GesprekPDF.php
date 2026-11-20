@@ -148,7 +148,7 @@ class GesprekPDF
                 foreach ($n['calls'] as $c) {
                     $rijen .= '<tr' . ($j++ % 2 ? ' class="alt"' : '') . '>'
                         . '<td class="lnk">' . date('d-m-Y H:i', strtotime($c['calldate'])) . '</td>'
-                        . '<td class="lnk">Toestel ' . htmlspecialchars($c['src']) . '</td>'
+                        . '<td class="lnk">Toestel ' . htmlspecialchars($c['src']) . (!empty($c['doorgeschakeld']) ? ' (doorgeschakeld)' : '') . '</td>'
                         . '<td class="c">' . $dur((int)$c['billsec']) . '</td>'
                         . '<td class="c">' . (int)$c['minuten'] . '</td>'
                         . '<td class="r">' . self::euro4($c['kosten']) . '</td>'
