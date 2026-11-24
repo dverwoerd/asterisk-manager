@@ -78,6 +78,7 @@ class SettingsController extends BaseController
         Database::setSetting('boekhouding_status', $keuze('boekhouding_status', ['boekhouding', 'concept', 'definitief', 'definitief_mailen'], 'boekhouding'));
         Database::setSetting('boekhouding_regels', $keuze('boekhouding_regels', ['totaal', 'categorie'], 'totaal'));
         Database::setSetting('boekhouding_btw', $keuze('boekhouding_btw', ['VH', 'VL', 'V0', 'VV', 'VEU', 'VEX'], 'VH'));
+        Database::setSetting('boekhouding_referentie', trim((string)$this->post('boekhouding_referentie', '')) ?: 'VoIP-abonnement {maand}');
         Database::setSetting('boekhouding_omschrijving', trim((string)$this->post('boekhouding_omschrijving', '')) ?: 'Gesprekskosten {maand}');
         Database::setSetting('boekhouding_artikel', trim((string)$this->post('boekhouding_artikel', '')));
         Database::setSetting('boekhouding_toestel_artikel', trim((string)$this->post('boekhouding_toestel_artikel', '')));

@@ -15,7 +15,8 @@
 //   boekhouding_toestel_artikel       artikelcode voor het eerste toestel (bijv. VOIP-BASIS; leeg = geen toestelregels)
 //   boekhouding_toestel_extra_artikel artikelcode voor elk volgend toestel (bijv. VOIP-EXTRA; leeg = basisartikel x aantal)
 //   boekhouding_toestel_omschrijving omschrijving van die regel, {maand} {aantal} {toestellen} (leeg = omschrijving van het artikel)
-//   boekhouding_omschrijving tekst van de factuurregel, {maand} = "november 2026"
+//   boekhouding_omschrijving tekst van de regel met gesprekskosten, {maand} = "november 2026"
+//   boekhouding_referentie   referentie van de factuur, {maand} {jaar} {klant} (standaard "VoIP-abonnement {maand}")
 //   boekhouding_btw          VH (21%), VL, V0, VV, VEU, VEX
 //   boekhouding_artikel      optioneel: artikelcode in de boekhouding (omzetrekening en BTW komen dan daarvandaan)
 //   boekhouding_pdf          1 = specificatie-PDF meesturen
@@ -175,7 +176,9 @@ class Boekhouding
         $d = [
             'bron'       => 'asterisk-manager',
             'extern_id'  => 'asterisk:gesprekken:' . $customer['id'] . ':' . $maand,
-            'referentie' => ucfirst($oms),
+            'referentie' => mb_substr(ucfirst(trim(strtr(self::instelling('boekhouding_referentie', 'VoIP-abonnement {maand}'), [
+                '{maand}' => $label, '{jaar}' => substr($maand, 0, 4), '{klant}' => trim((string)($customer['company_name'] ?: $customer['contact_name'])),
+            ])) ?: $oms), 0, 150),
             'klant'      => [
                 'extern_id'      => 'asterisk:klant:' . $customer['id'],
                 'naam'           => $naam,
