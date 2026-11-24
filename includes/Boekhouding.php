@@ -11,6 +11,7 @@
 //   boekhouding_api_key      sleutel uit de boekhouding (tandwiel > Bedrijfsgegevens > Koppeling)
 //   boekhouding_status       boekhouding | concept | definitief | definitief_mailen
 //   boekhouding_regels       totaal (1 bedragregel, specificatie alleen in de PDF) | categorie (bedragregel per categorie)
+//   boekhouding_vaste_artikelen       artikelcodes die bovenaan elke factuur komen, 1 x elk (bijv. DIENST01; komma-gescheiden)
 //   boekhouding_toestel_artikel       artikelcode voor het eerste toestel (bijv. VOIP-BASIS; leeg = geen toestelregels)
 //   boekhouding_toestel_extra_artikel artikelcode voor elk volgend toestel (bijv. VOIP-EXTRA; leeg = basisartikel x aantal)
 //   boekhouding_toestel_omschrijving omschrijving van die regel, {maand} {aantal} {toestellen} (leeg = omschrijving van het artikel)
@@ -126,6 +127,13 @@ class Boekhouding
         return $uit;
     }
 
+    /** Vaste artikelen bovenaan elke factuur (bijv. DIENST01), 1 x elk; komma-gescheiden in de instelling. */
+    public static function vasteRegels(): array
+    {
+        $codes = array_filter(array_map('trim', explode(',', self::instelling('boekhouding_vaste_artikelen'))));
+        return array_map(fn($c) => ['artikel' => $c, 'aantal' => 1], array_values($codes));
+    }
+
     public static function bericht(array $customer, string $maand, array $spec, ?string $pdf = null, bool $overschrijven = false): array
     {
         $label = self::maandLabel($maand);
@@ -158,7 +166,8 @@ class Boekhouding
         }
         // geen gesprekskosten: geen gespreksregel (tenzij "ook € 0,00 versturen" aan staat)
         if ($totaal == 0 && self::instelling('boekhouding_nul') !== '1') $regels = [];
-        foreach (self::toestelRegels($customer, $maand) as $t) $regels[] = $t;
+        // volgorde op de factuur: vaste artikelen (bijv. DIENST01), toestellen (VOIP-BASIS, VOIP-EXTRA), dan de gesprekskosten
+        $regels = array_merge(self::vasteRegels(), self::toestelRegels($customer, $maand), $regels);
         if (!$regels) $regels[] = $regel($oms, 0);
 
         $naam = trim((string)($customer['company_name'] ?: $customer['contact_name']));

@@ -413,6 +413,12 @@
                         <input type="text" name="boekhouding_artikel" class="form-control mono" value="<?= sanitize($bk('boekhouding_artikel')) ?>"
                                placeholder="bijv. TEL-GESPREK: omzetrekening en BTW komen dan van dat artikel">
                     </div>
+                    <div class="form-group">
+                        <label>Vaste artikelen bovenaan elke factuur (optioneel)</label>
+                        <input type="text" name="boekhouding_vaste_artikelen" class="form-control mono" value="<?= sanitize($bk('boekhouding_vaste_artikelen')) ?>"
+                               placeholder="bijv. DIENST01 (meerdere: komma ertussen)">
+                        <small class="text-muted">Volgorde op de factuur: deze artikelen (1 × elk), dan de toestellen, dan de gesprekskosten.</small>
+                    </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Artikel eerste toestel (optioneel)</label>

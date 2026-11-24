@@ -36,6 +36,8 @@ De gespreksspecificaties kunnen per klant en maand als factuur naar de boekhoudi
 - Klanten worden gekoppeld via `asterisk:klant:<id>` (en anders BTW-nummer, e-mail of naam) en zo nodig aangemaakt.
 - Opnieuw versturen vervangt de conceptfactuur van dezelfde klant en maand. Een definitieve factuur alleen na bevestiging.
 - Regels: één regel met het totaal van de gesprekskosten (de specificatie staat in de PDF-bijlage), of een bedragregel per categorie (instelbaar).
+- Vaste artikelen: *Vaste artikelen bovenaan elke factuur* (bijv. `DIENST01`, meerdere met komma's) komen 1 x op elke factuur.
+- Volgorde op de factuur: vaste artikelen (DIENST01), VOIP-BASIS, VOIP-EXTRA, gesprekskosten.
 - Toestellen: vul bij Settings > Boekhouding de artikelcodes in (aangemaakt in de boekhouding met prijs en BTW):
   *Artikel eerste toestel* (bijv. `VOIP-BASIS`) en *Artikel extra toestellen* (bijv. `VOIP-EXTRA`).
   1 toestel = 1 x VOIP-BASIS; meerdere toestellen = 1 x VOIP-BASIS + VOIP-EXTRA voor elk volgend toestel (3 toestellen: 1 x BASIS, 2 x EXTRA).
