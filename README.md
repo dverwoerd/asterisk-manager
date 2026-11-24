@@ -39,7 +39,7 @@ De gespreksspecificaties kunnen per klant en maand als factuur naar de boekhoudi
 - Toestellen: vul bij Settings > Boekhouding de artikelcodes in (aangemaakt in de boekhouding met prijs en BTW):
   *Artikel eerste toestel* (bijv. `VOIP-BASIS`) en *Artikel extra toestellen* (bijv. `VOIP-EXTRA`).
   1 toestel = 1 x VOIP-BASIS; meerdere toestellen = 1 x VOIP-BASIS + VOIP-EXTRA voor elk volgend toestel (3 toestellen: 1 x BASIS, 2 x EXTRA).
-  Zonder extra-artikel: basisartikel x aantal. Toestellen = toestelnummers bij Customers; uitgeschakelde extensies tellen niet mee.
+  Zonder extra-artikel: basisartikel x aantal. Toestellen = de aangevinkte extensies bij Customers die aan staan; "Overige nummers" (DID, oud toestel) en uitgeschakelde extensies tellen niet mee.
   Omschrijving optioneel met `{maand}`, `{aantal}` en `{toestellen}`. Klanten zonder gesprekken krijgen alleen de toestelregels.
 - Status per klant staat in de kolom *Boekhouding* (tabel `boekhouding_facturen`, wordt automatisch aangemaakt).
 - Automatisch elke maand (vink aan in Settings > Boekhouding), cronjob op de 1e:

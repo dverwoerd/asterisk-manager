@@ -89,20 +89,16 @@ class Boekhouding
     /**
      * Bouwt het bericht voor de boekhouding uit een specificatie (GesprekspecificatiesController::bouwSpecificatie).
      */
-    /** Toestellen (extensies) van een klant: de toestelnummers uit de klantkaart die als extensie bestaan en aan staan. */
+    /**
+     * Toestellen van een klant: de aangevinkte extensies uit de klantkaart die bestaan en aan staan.
+     * "Overige nummers" (DID, oud toestel) staan ook in extensions_csv, maar zijn alleen voor de gesprekken en tellen niet als toestel.
+     */
     public static function toestellen(array $customer): array
     {
         $lijst = array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($customer['extensions_csv'] ?? ''))))));
         if (!$lijst) return [];
-        try {
-            $ph = implode(',', array_fill(0, count($lijst), '?'));
-            $bestaand = array_column(Database::fetchAll("SELECT extension FROM extensions WHERE extension IN ($ph) AND enabled = 1", $lijst), 'extension');
-            $alle = array_column(Database::fetchAll("SELECT extension FROM extensions WHERE extension IN ($ph)", $lijst), 'extension');
-            // toestelnummers die niet in de extensielijst staan (bijv. extern beheerd) tellen ook mee; uitgeschakelde niet
-            $lijst = array_values(array_filter($lijst, fn($e) => in_array($e, $bestaand, true) || !in_array($e, $alle, true)));
-        } catch (Exception $e) {
-            // extensietabel niet beschikbaar: de klantkaart is leidend
-        }
+        $ph = implode(',', array_fill(0, count($lijst), '?'));
+        $lijst = array_column(Database::fetchAll("SELECT extension FROM extensions WHERE extension IN ($ph) AND enabled = 1", $lijst), 'extension');
         sort($lijst, SORT_NATURAL);
         return $lijst;
     }
