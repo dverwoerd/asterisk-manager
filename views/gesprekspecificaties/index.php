@@ -1,7 +1,16 @@
 <div class="page-header">
     <h1 class="page-title">Gespreksspecificaties</h1>
     <div class="page-actions">
-        <!-- leeg: acties staan per rij -->
+        <?php if (!empty($boekhouding) && !empty($overzicht)): ?>
+        <form method="POST" action="?page=gesprekspecificaties&action=boekhouding_alle" style="display:inline"
+              onsubmit="return confirm('Voor alle klanten van deze maand een factuur in de boekhouding laten maken?\nConceptfacturen van eerdere verzendingen worden vervangen; definitieve facturen blijven staan.')">
+            <?= csrf() ?>
+            <input type="hidden" name="maand" value="<?= sanitize($maand) ?>">
+            <button type="submit" class="btn btn-accent">⇪ Alle klanten naar boekhouding</button>
+        </form>
+        <?php elseif (empty($boekhouding)): ?>
+        <a href="?page=settings" class="btn btn-ghost btn-sm" title="Koppeling met de boekhouding instellen (Settings, tab Boekhouding)">⚙ Boekhouding koppelen</a>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -71,7 +80,8 @@
                     <th class="text-right">Gesprekken</th>
                     <th class="text-right">Totale duur</th>
                     <th class="text-right">Kosten excl. BTW</th>
-                    <th class="text-center" style="width:180px">Acties</th>
+                    <?php if (!empty($boekhouding)): ?><th>Boekhouding</th><?php endif; ?>
+                    <th class="text-center" style="width:<?= !empty($boekhouding) ? 300 : 180 ?>px">Acties</th>
                 </tr>
             </thead>
             <tbody>
@@ -90,7 +100,29 @@
                         </span>
                         <?php endif; ?>
                     </td>
+                    <?php $bs = !empty($boekhouding) ? ($boekhouding_status[$r['id']] ?? null) : null; ?>
+                    <?php if (!empty($boekhouding)): ?>
+                    <td style="font-size:12px">
+                        <?php if (!$bs): ?><span class="text-muted">nog niet verstuurd</span>
+                        <?php elseif ($bs['gelukt']): ?>
+                            <span style="color:var(--success)">✓ <?= $bs['factuurnummer'] ? 'Factuur ' . sanitize($bs['factuurnummer']) : 'Concept' ?></span>
+                            <br><span class="text-muted"><?= date('d-m-Y H:i', strtotime($bs['verstuurd_op'])) ?></span>
+                        <?php else: ?>
+                            <span style="color:var(--warning)" title="<?= sanitize($bs['bericht']) ?>">⚠ <?= sanitize(mb_strimwidth($bs['bericht'], 0, 60, '…')) ?></span>
+                        <?php endif; ?>
+                    </td>
+                    <?php endif; ?>
                     <td class="text-center">
+                        <?php if (!empty($boekhouding)): $def = $bs && $bs['status'] !== '' && $bs['status'] !== 'concept'; ?>
+                        <form method="POST" action="?page=gesprekspecificaties&action=boekhouding" style="display:inline"
+                              <?php if ($def): ?>onsubmit="return confirm('Er is al een definitieve factuur (<?= sanitize((string)$bs['factuurnummer']) ?>). Opnieuw versturen en die factuur vervangen?')"<?php endif; ?>>
+                            <?= csrf() ?>
+                            <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                            <input type="hidden" name="maand" value="<?= sanitize($r['maand']) ?>">
+                            <?php if ($def): ?><input type="hidden" name="overschrijven" value="1"><?php endif; ?>
+                            <button type="submit" class="btn btn-ghost btn-sm" title="Factuur laten maken in de boekhouding (met de specificatie als bijlage)">⇪ <?= $bs && $bs['gelukt'] ? 'Opnieuw' : 'Boekhouding' ?></button>
+                        </form>
+                        <?php endif; ?>
                         <a href="?page=gesprekspecificaties&action=detail&id=<?= $r['id'] ?>&maand=<?= $r['maand'] ?>"
                            class="btn btn-ghost btn-sm">
                             ☰ Detail
@@ -111,6 +143,7 @@
                     <td class="text-right mono" style="color:var(--accent)">
                         € <?= number_format(array_sum(array_column($overzicht, 'totaal_kosten')), 2, ',', '.') ?>
                     </td>
+                    <?php if (!empty($boekhouding)): ?><td></td><?php endif; ?>
                     <td></td>
                 </tr>
             </tfoot>

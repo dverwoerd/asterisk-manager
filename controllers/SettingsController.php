@@ -64,6 +64,50 @@ class SettingsController extends BaseController
         redirect('?page=settings');
     }
 
+    // ---- koppeling met de boekhouding ----
+
+    private function boekhoudingOpslaan(): void
+    {
+        $this->requireAdmin();
+        $url = trim((string)$this->post('boekhouding_url', ''));
+        if ($url !== '' && !preg_match('#^https?://#i', $url)) $url = 'https://' . $url;
+        Database::setSetting('boekhouding_url', $url);
+        $sleutel = trim((string)$this->post('boekhouding_api_key', ''));
+        if ($sleutel !== '') Database::setSetting('boekhouding_api_key', $sleutel);
+        $keuze = fn($k, array $ok, $std) => in_array($this->post($k), $ok, true) ? $this->post($k) : $std;
+        Database::setSetting('boekhouding_status', $keuze('boekhouding_status', ['boekhouding', 'concept', 'definitief', 'definitief_mailen'], 'boekhouding'));
+        Database::setSetting('boekhouding_regels', $keuze('boekhouding_regels', ['totaal', 'categorie'], 'totaal'));
+        Database::setSetting('boekhouding_btw', $keuze('boekhouding_btw', ['VH', 'VL', 'V0', 'VV', 'VEU', 'VEX'], 'VH'));
+        Database::setSetting('boekhouding_omschrijving', trim((string)$this->post('boekhouding_omschrijving', '')) ?: 'Gesprekskosten {maand}');
+        Database::setSetting('boekhouding_artikel', trim((string)$this->post('boekhouding_artikel', '')));
+        foreach (['boekhouding_pdf', 'boekhouding_nul', 'boekhouding_auto'] as $k) Database::setSetting($k, $this->post($k) ? '1' : '0');
+    }
+
+    public function post_boekhouding_save(): void
+    {
+        $this->boekhoudingOpslaan();
+        $this->flash('success', 'Koppeling met de boekhouding opgeslagen.');
+        redirect('?page=settings#boekhouding');
+    }
+
+    public function post_boekhouding_test(): void
+    {
+        $this->boekhoudingOpslaan();
+        require_once APP_ROOT . '/includes/Boekhouding.php';
+        try {
+            $a = Boekhouding::ping();
+            if ($a['ok'] ?? false) {
+                $this->flash('success', 'Verbinding met de boekhouding van <strong>' . sanitize((string)($a['bedrijf'] ?? '')) . '</strong> werkt (versie '
+                    . sanitize((string)($a['versie'] ?? '?')) . ').');
+            } else {
+                $this->flash('danger', 'Boekhouding antwoordt: ' . sanitize((string)($a['melding'] ?? 'onbekende fout')));
+            }
+        } catch (Exception $e) {
+            $this->flash('danger', sanitize($e->getMessage()));
+        }
+        redirect('?page=settings#boekhouding');
+    }
+
     public function smtp(): void
     {
         $smtp = [

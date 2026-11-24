@@ -14,8 +14,26 @@ $eur = fn(float $v, int $d = 2) => '€ ' . number_format($v, $d, ',', '.');
         <a href="?page=gesprekspecificaties&maand=<?= $maand ?>" class="btn btn-ghost">← Terug</a>
         <a href="?page=gesprekspecificaties&action=pdf&id=<?= $customer['id'] ?>&maand=<?= $maand ?>"
            class="btn btn-accent" target="_blank">↓ PDF downloaden</a>
+        <?php if (!empty($boekhouding)): $bs = $boekhouding_status; $def = $bs && $bs['status'] !== '' && $bs['status'] !== 'concept'; ?>
+        <form method="POST" action="?page=gesprekspecificaties&action=boekhouding" style="display:inline"
+              <?php if ($def): ?>onsubmit="return confirm('Er is al een definitieve factuur (<?= sanitize((string)$bs['factuurnummer']) ?>). Opnieuw versturen en die factuur vervangen?')"<?php endif; ?>>
+            <?= csrf() ?>
+            <input type="hidden" name="id" value="<?= (int)$customer['id'] ?>">
+            <input type="hidden" name="maand" value="<?= sanitize($maand) ?>">
+            <input type="hidden" name="terug" value="detail">
+            <?php if ($def): ?><input type="hidden" name="overschrijven" value="1"><?php endif; ?>
+            <button type="submit" class="btn btn-accent">⇪ <?= $bs && $bs['gelukt'] ? 'Opnieuw naar boekhouding' : 'Factuur maken in boekhouding' ?></button>
+        </form>
+        <?php endif; ?>
     </div>
 </div>
+<?php if (!empty($boekhouding_status)): $bs = $boekhouding_status; ?>
+<div class="alert alert-<?= $bs['gelukt'] ? 'success' : 'warning' ?> mb-4"><div>
+    <strong>Boekhouding:</strong>
+    <?= $bs['gelukt'] ? ($bs['factuurnummer'] ? 'factuur ' . sanitize($bs['factuurnummer']) : 'conceptfactuur') . ' (' . sanitize($bs['status']) . ($bs['bedrag'] !== null ? ', € ' . number_format((float)$bs['bedrag'], 2, ',', '.') . ' incl. BTW' : '') . '). ' : '' ?>
+    <?= sanitize($bs['bericht']) ?> · verstuurd <?= date('d-m-Y H:i', strtotime($bs['verstuurd_op'])) ?>
+</div></div>
+<?php endif; ?>
 
 <?php if (!empty($spec['zonder_tarief'])): ?>
 <div class="alert alert-warning mb-4"><div>

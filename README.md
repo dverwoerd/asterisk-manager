@@ -24,6 +24,29 @@ A complete web-based management system for **Asterisk 22** on Debian with Apache
 
 ---
 
+## Boekhouding koppelen (facturen van gespreksspecificaties)
+
+De gespreksspecificaties kunnen per klant en maand als factuur naar de boekhouding (api.php van de boekhoudapplicatie):
+
+1. In de boekhouding: tandwiel > Bedrijfsgegevens > **Koppeling (API)** > *Nieuwe API-sleutel maken*.
+2. Hier: **Settings > 📒 Boekhouding**: adres (`https://.../boekhouding/api.php`) en sleutel invullen, *Opslaan en verbinding testen*.
+3. **Gespreksspecificaties**: knop **⇪ Boekhouding** per klant, of **⇪ Alle klanten naar boekhouding** voor de hele maand.
+
+- De boekhouding maakt een factuur (concept of definitief, instelbaar) met de specificatie-PDF als bijlage; die gaat mee met de factuurmail.
+- Klanten worden gekoppeld via `asterisk:klant:<id>` (en anders BTW-nummer, e-mail of naam) en zo nodig aangemaakt.
+- Opnieuw versturen vervangt de conceptfactuur van dezelfde klant en maand. Een definitieve factuur alleen na bevestiging.
+- Regels: één bedragregel met per categorie een tekstregel, of een bedragregel per categorie (instelbaar).
+- Status per klant staat in de kolom *Boekhouding* (tabel `boekhouding_facturen`, wordt automatisch aangemaakt).
+- Automatisch elke maand (vink aan in Settings > Boekhouding), cronjob op de 1e:
+
+```bash
+0 6 1 * * php /var/www/asterisk-manager/cron/boekhouding_push.php >> /var/www/asterisk-manager/logs/boekhouding.log 2>&1
+```
+
+Handmatig een maand: `php cron/boekhouding_push.php 2026-10`.
+
+---
+
 ## Requirements
 
 - Debian 11 or 12 (Bookworm recommended)

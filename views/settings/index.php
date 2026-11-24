@@ -10,6 +10,7 @@
         <button class="tab-item" onclick="showTab('provisioning')">Provisioning</button>
         <button class="tab-item" onclick="showTab('system')">System</button>
         <button class="tab-item" onclick="showTab('smtp')">✉ SMTP</button>
+        <button class="tab-item" onclick="showTab('boekhouding')">📒 Boekhouding</button>
         <button class="tab-item" onclick="showTab('links')">🔗 Meer</button>
     </div>
 
@@ -352,6 +353,85 @@
         </div>
     </div>
 
+    <!-- Boekhouding Tab -->
+    <?php $bk = fn($k, $d = '') => (string)($settings[$k] ?? $d); ?>
+    <div class="tab-pane" id="tab-boekhouding" style="display:none">
+        <div class="card mt-4" style="max-width:760px">
+            <div class="card-header"><h3 class="card-title">📒 Koppeling met de boekhouding</h3></div>
+            <div class="card-body">
+                <p class="text-muted text-sm mb-4">
+                    Met de knop <strong>⇪ Boekhouding</strong> bij Gespreksspecificaties maakt de boekhouding een factuur voor de klant over die maand,
+                    met de specificatie-PDF als bijlage (die gaat mee met de factuurmail). Opnieuw versturen vervangt de conceptfactuur van dezelfde klant en maand.
+                    De sleutel maak je in de boekhouding onder het tandwiel &gt; Bedrijfsgegevens &gt; Koppeling (API).
+                </p>
+                <form method="POST" action="?page=settings&action=boekhouding_save">
+                    <?= csrf() ?>
+                    <div class="form-group">
+                        <label>Adres van de boekhouding (api.php)</label>
+                        <input type="url" name="boekhouding_url" class="form-control mono" value="<?= sanitize($bk('boekhouding_url')) ?>"
+                               placeholder="https://boekhouding.pantronic.nl/api.php">
+                    </div>
+                    <div class="form-group">
+                        <label>API-sleutel</label>
+                        <input type="password" name="boekhouding_api_key" class="form-control mono" autocomplete="new-password"
+                               placeholder="<?= $bk('boekhouding_api_key') !== '' ? 'opgeslagen, leeg laten = niet wijzigen' : 'bk_…' ?>">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Factuur in de boekhouding</label>
+                            <select name="boekhouding_status" class="form-control">
+                                <?php foreach (['boekhouding' => 'Volgens instelling in de boekhouding', 'concept' => 'Als concept (zelf controleren)',
+                                                'definitief' => 'Direct definitief', 'definitief_mailen' => 'Direct definitief en mailen naar de klant'] as $w => $l): ?>
+                                <option value="<?= $w ?>" <?= $bk('boekhouding_status', 'boekhouding') === $w ? 'selected' : '' ?>><?= $l ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Factuurregels</label>
+                            <select name="boekhouding_regels" class="form-control">
+                                <option value="totaal" <?= $bk('boekhouding_regels', 'totaal') === 'totaal' ? 'selected' : '' ?>>Eén bedrag + tekstregel per categorie</option>
+                                <option value="categorie" <?= $bk('boekhouding_regels') === 'categorie' ? 'selected' : '' ?>>Een bedragregel per categorie</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Omschrijving ({maand} = bijv. november 2026)</label>
+                            <input type="text" name="boekhouding_omschrijving" class="form-control" value="<?= sanitize($bk('boekhouding_omschrijving', 'Gesprekskosten {maand}')) ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>BTW</label>
+                            <select name="boekhouding_btw" class="form-control">
+                                <?php foreach (['VH' => '21%', 'VL' => '9%', 'V0' => '0% / vrijgesteld', 'VV' => 'Verlegd (NL)', 'VEU' => 'Verlegd (EU)', 'VEX' => 'Export buiten EU'] as $w => $l): ?>
+                                <option value="<?= $w ?>" <?= $bk('boekhouding_btw', 'VH') === $w ? 'selected' : '' ?>><?= $l ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Artikelcode in de boekhouding (optioneel)</label>
+                        <input type="text" name="boekhouding_artikel" class="form-control mono" value="<?= sanitize($bk('boekhouding_artikel')) ?>"
+                               placeholder="bijv. TEL-GESPREK: omzetrekening en BTW komen dan van dat artikel">
+                    </div>
+                    <div class="form-group">
+                        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="boekhouding_pdf" value="1" <?= $bk('boekhouding_pdf', '1') === '1' ? 'checked' : '' ?>> Specificatie-PDF meesturen als bijlage</label>
+                        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="boekhouding_nul" value="1" <?= $bk('boekhouding_nul') === '1' ? 'checked' : '' ?>> Ook klanten met € 0,00 aan gesprekskosten versturen</label>
+                        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="boekhouding_auto" value="1" <?= $bk('boekhouding_auto') === '1' ? 'checked' : '' ?>> Elke maand automatisch versturen (cron, zie hieronder)</label>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button type="submit" class="btn btn-accent">Opslaan</button>
+                        <button type="submit" class="btn btn-ghost" formaction="?page=settings&action=boekhouding_test">Opslaan en verbinding testen</button>
+                    </div>
+                </form>
+                <p class="text-muted text-sm mt-4">
+                    Automatisch: cronjob op de 1e van de maand, bijvoorbeeld om 06:00, verstuurt de vorige maand:<br>
+                    <code>0 6 1 * * php <?= sanitize(APP_ROOT) ?>/cron/boekhouding_push.php</code><br>
+                    Handmatig een maand versturen: <code>php <?= sanitize(APP_ROOT) ?>/cron/boekhouding_push.php 2026-10</code>
+                </p>
+            </div>
+        </div>
+    </div>
+
     <!-- Meer Tab -->
     <div class="tab-pane" id="tab-links" style="display:none">
         <div class="card mt-4">
@@ -375,6 +455,14 @@ function showTab(name) {
     document.getElementById('tab-' + name).style.display = '';
     event.target.classList.add('active');
 }
+
+// tab openen via #naam in de URL (bijv. na opslaan: ?page=settings#boekhouding)
+document.addEventListener('DOMContentLoaded', function () {
+    const h = location.hash.slice(1);
+    if (!h || !document.getElementById('tab-' + h)) return;
+    const knop = [...document.querySelectorAll('.tab-item')].find(b => b.getAttribute('onclick') === "showTab('" + h + "')");
+    if (knop) knop.click();
+});
 
 async function testAMI() {
     const result = document.getElementById('ami-test-result');

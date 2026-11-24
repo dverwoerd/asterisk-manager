@@ -70,9 +70,12 @@ class GesprekspecificatiesController extends BaseController
              LIMIT 24"
         );
 
+        require_once APP_ROOT . '/includes/Boekhouding.php';
         $this->view('gesprekspecificaties.index', [
             'title'     => 'Gespreksspecificaties',
             'overzicht' => $overzicht,
+            'boekhouding'        => Boekhouding::ingesteld(),
+            'boekhouding_status' => Boekhouding::status($maand),
             'maand'     => $maand,
             'maanden'   => $maanden,
             'dateFrom'  => $dateFrom,
@@ -94,7 +97,10 @@ class GesprekspecificatiesController extends BaseController
         $calls = $this->fetchCalls($customer, $dateFrom, $dateTo);
         $spec  = self::bouwSpecificatie($calls);
 
+        require_once APP_ROOT . '/includes/Boekhouding.php';
         $this->view('gesprekspecificaties.detail', [
+            'boekhouding'        => Boekhouding::ingesteld(),
+            'boekhouding_status' => Boekhouding::status($maand)[$customer['id']] ?? null,
             'title'      => 'Gespreksspecificaties — ' . ($customer['company_name'] ?: $customer['contact_name']),
             'customer'   => $customer,
             'maand'      => $maand,
@@ -119,15 +125,82 @@ class GesprekspecificatiesController extends BaseController
         $calls = $this->fetchCalls($customer, $dateFrom, $dateTo);
         $spec  = self::bouwSpecificatie($calls);
 
-        $company = [
+        require_once APP_ROOT . '/includes/GesprekPDF.php';
+        GesprekPDF::download($customer, self::bedrijf(), $this->maandNaam($mnr) . ' ' . $jaar, $spec);
+    }
+
+    /** Bedrijfsgegevens voor de PDF (gedeeld met de koppeling met de boekhouding). */
+    public static function bedrijf(): array
+    {
+        return [
             'name'    => getSetting('company_name',    'Pantronic IT'),
             'address' => getSetting('company_address', 'Bobinestraat 7-17, 3903 KE Veenendaal'),
             'phone'   => getSetting('company_phone',   '0318-478226'),
             'email'   => getSetting('company_email',   'welkom@pantronic.nl'),
         ];
+    }
 
-        require_once APP_ROOT . '/includes/GesprekPDF.php';
-        GesprekPDF::download($customer, $company, $this->maandNaam($mnr) . ' ' . $jaar, $spec);
+    /** Complete specificatie van een klant over een maand (JJJJ-MM), zoals op het scherm en in de PDF. */
+    public function specificatieVoor(array $customer, string $maand): array
+    {
+        [$dateFrom, $dateTo] = $this->periode($maand);
+        return self::bouwSpecificatie($this->fetchCalls($customer, $dateFrom, $dateTo));
+    }
+
+    // ---- boekhouding: factuur laten maken voor één klant (POST id, maand, overschrijven) ----
+
+    public function post_boekhouding(): void
+    {
+        $this->requireOperator();
+        require_once APP_ROOT . '/includes/Boekhouding.php';
+        $maand    = $this->geldigeMaand((string)$this->post('maand', ''));
+        $customer = Database::fetchOne("SELECT * FROM customers WHERE id=?", [(int)$this->post('id', 0)]);
+        $terug    = $this->post('terug') === 'detail'
+            ? '?page=gesprekspecificaties&action=detail&id=' . (int)$this->post('id', 0) . '&maand=' . $maand
+            : '?page=gesprekspecificaties&maand=' . $maand;
+        if (!$customer) redirect($terug);
+        $naam = sanitize($customer['company_name'] ?: $customer['contact_name']);
+        try {
+            $a = Boekhouding::verstuur($customer, $maand, (bool)$this->post('overschrijven', false));
+            if (!empty($a['overgeslagen'])) {
+                $this->flash('info', $naam . ': ' . sanitize($a['melding']));
+            } elseif ($a['ok'] ?? false) {
+                $this->flash('success', $naam . ': ' . (!empty($a['nummer']) ? 'factuur ' . sanitize((string)$a['nummer']) : 'conceptfactuur')
+                    . ' ' . sanitize($a['actie'] ?? 'aangemaakt') . ' in de boekhouding (€ '
+                    . number_format((float)$a['totaal_incl'], 2, ',', '.') . ' incl. BTW)'
+                    . (!empty($a['gemaild']) ? ' en gemaild.' : '.')
+                    . (isset($a['mail_fout']) ? ' Mailen mislukt: ' . sanitize($a['mail_fout']) : ''));
+            } else {
+                $this->flash(($a['reden'] ?? '') === 'bestaat_al' ? 'warning' : 'danger', $naam . ': ' . sanitize((string)($a['melding'] ?? 'onbekende fout')));
+            }
+        } catch (Exception $e) {
+            $this->flash('danger', $naam . ': ' . sanitize($e->getMessage()));
+        }
+        redirect($terug);
+    }
+
+    // ---- boekhouding: alle klanten van een maand ----
+
+    public function post_boekhouding_alle(): void
+    {
+        $this->requireOperator();
+        require_once APP_ROOT . '/includes/Boekhouding.php';
+        $maand = $this->geldigeMaand((string)$this->post('maand', ''));
+        try {
+            $s = Boekhouding::verstuurAlle($maand, false);
+            $tekst = "{$s['verstuurd']} factuur/facturen verstuurd naar de boekhouding";
+            if ($s['bestond_al']) $tekst .= ", {$s['bestond_al']} al definitief (niet overschreven)";
+            if ($s['overgeslagen']) $tekst .= ", {$s['overgeslagen']} zonder kosten overgeslagen";
+            $this->flash($s['fouten'] ? 'warning' : 'success', sanitize($tekst . '.') . ($s['fouten'] ? '<br>Fouten: ' . sanitize(implode('; ', $s['fouten'])) : ''));
+        } catch (Exception $e) {
+            $this->flash('danger', sanitize($e->getMessage()));
+        }
+        redirect('?page=gesprekspecificaties&maand=' . $maand);
+    }
+
+    private function geldigeMaand(string $maand): string
+    {
+        return preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $maand) ? $maand : date('Y-m', strtotime('first day of last month'));
     }
 
     // ================================================================
