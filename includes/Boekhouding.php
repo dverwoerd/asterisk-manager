@@ -16,7 +16,7 @@
 //   boekhouding_toestel_extra_artikel artikelcode voor elk volgend toestel (bijv. VOIP-EXTRA; leeg = basisartikel x aantal)
 //   boekhouding_toestel_omschrijving omschrijving van die regel, {maand} {aantal} {toestellen} (leeg = omschrijving van het artikel)
 //   boekhouding_omschrijving tekst van de regel met gesprekskosten, {maand} = "november 2026"
-//   boekhouding_referentie   referentie van de factuur, {maand} {jaar} {klant} (standaard "VoIP-abonnement {maand}")
+//   boekhouding_referentie   referentie van de factuur, {mm-jjjj} (11-2026) {mm} {maand} {jaar} {klant} (standaard "VoIP-abonnement {mm-jjjj}")
 //   boekhouding_btw          VH (21%), VL, V0, VV, VEU, VEX
 //   boekhouding_artikel      optioneel: artikelcode in de boekhouding (omzetrekening en BTW komen dan daarvandaan)
 //   boekhouding_pdf          1 = specificatie-PDF meesturen
@@ -135,6 +135,17 @@ class Boekhouding
         return array_map(fn($c) => ['artikel' => $c, 'aantal' => 1], array_values($codes));
     }
 
+    /** Sjabloon voor de referentie; de eerdere standaard ("... {maand}") wordt eenmalig omgezet naar "VoIP-abonnement {mm-jjjj}" (11-2026). */
+    public static function referentieSjabloon(): string
+    {
+        $ref = self::instelling('boekhouding_referentie', 'VoIP-abonnement {mm-jjjj}');
+        if ($ref === 'VoIP-abonnement {maand}') {
+            $ref = 'VoIP-abonnement {mm-jjjj}';
+            try { Database::setSetting('boekhouding_referentie', $ref); } catch (Exception $e) {}
+        }
+        return $ref;
+    }
+
     public static function bericht(array $customer, string $maand, array $spec, ?string $pdf = null, bool $overschrijven = false): array
     {
         $label = self::maandLabel($maand);
@@ -176,7 +187,8 @@ class Boekhouding
         $d = [
             'bron'       => 'asterisk-manager',
             'extern_id'  => 'asterisk:gesprekken:' . $customer['id'] . ':' . $maand,
-            'referentie' => mb_substr(ucfirst(trim(strtr(self::instelling('boekhouding_referentie', 'VoIP-abonnement {maand}'), [
+            'referentie' => mb_substr(ucfirst(trim(strtr(self::referentieSjabloon(), [
+                '{mm-jjjj}' => substr($maand, 5, 2) . '-' . substr($maand, 0, 4), '{mm}' => substr($maand, 5, 2),
                 '{maand}' => $label, '{jaar}' => substr($maand, 0, 4), '{klant}' => trim((string)($customer['company_name'] ?: $customer['contact_name'])),
             ])) ?: $oms), 0, 150),
             'klant'      => [

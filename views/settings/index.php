@@ -396,8 +396,8 @@
                     </div>
                     <div class="form-group">
                         <label>Referentie van de factuur</label>
-                        <input type="text" name="boekhouding_referentie" class="form-control" value="<?= sanitize($bk('boekhouding_referentie', 'VoIP-abonnement {maand}')) ?>">
-                        <small class="text-muted">{maand} = bijv. november 2026, {jaar} = 2026, {klant} = naam van de klant.</small>
+                        <input type="text" name="boekhouding_referentie" class="form-control" value="<?= sanitize(Boekhouding::referentieSjabloon()) ?>">
+                        <small class="text-muted">{mm-jjjj} = 11-2026, {mm} = 11, {jaar} = 2026, {maand} = november 2026, {klant} = naam van de klant.</small>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
