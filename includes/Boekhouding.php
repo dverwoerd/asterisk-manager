@@ -268,13 +268,52 @@ class Boekhouding
     }
 
     /** HTTP-aanroep naar api.php van de boekhouding. */
-    public static function http(string $methode, string $actie, ?array $body = null): array
+    /** Ingestelde artikelcodes in de boekhouding controleren. Geeft een lijst met problemen (leeg = alles in orde) en de gevonden artikelen. */
+    public static function controleerArtikelen(): array
+    {
+        $codes = [];
+        foreach (self::vasteRegels() as $r) $codes[$r['artikel']] = 'vast artikel';
+        if (($c = self::instelling('boekhouding_toestel_artikel')) !== '') $codes[$c] = 'eerste toestel';
+        if (($c = self::instelling('boekhouding_toestel_extra_artikel')) !== '') $codes[$c] = 'extra toestellen';
+        $dubbel = [];
+        if (($c = self::instelling('boekhouding_artikel')) !== '') {
+            if (isset($codes[$c])) $dubbel[] = "Artikel $c staat ook bij \"Artikelcode in de boekhouding\" (dat veld is voor de gesprekskosten). Maak dat veld leeg.";
+            elseif (in_array($c, ['DIENST01'], true) || !self::vasteRegels()) $dubbel[] = "Let op: \"Artikelcode in de boekhouding\" ($c) wordt gebruikt voor de regel met gesprekskosten, niet als losse regel. Een vast artikel zoals DIENST01 hoort bij \"Vaste artikelen bovenaan elke factuur\".";
+            $codes[$c] = 'gesprekskosten';
+        }
+        if (!$codes) return [[], []];
+        $a = self::http('GET', 'artikelen', null, ['codes' => implode(',', array_keys($codes))]);
+        if (!($a['ok'] ?? false) || !isset($a['artikelen'])) return [['De boekhouding kan artikelen nog niet controleren (werk de boekhouding bij).'], []];
+        $problemen = $dubbel;
+        foreach ($codes as $code => $rol) {
+            $x = $a['artikelen'][$code] ?? ['bestaat' => false];
+            if (empty($x['bestaat'])) $problemen[] = "Artikel $code ($rol) bestaat niet in de boekhouding.";
+            elseif (!empty($x['tekstregel'])) $problemen[] = "Artikel $code ($rol) is in de boekhouding een tekstregel: er komt geen bedrag op de factuur.";
+            elseif ($x['prijs'] === null && $rol !== 'gesprekskosten') $problemen[] = "Artikel $code ($rol) heeft geen prijs in de boekhouding.";
+            elseif (empty($x['actief'])) $problemen[] = "Artikel $code ($rol) staat in de boekhouding op inactief.";
+        }
+        return [$problemen, $a['artikelen']];
+    }
+
+    /** Korte samenvatting van de regels zoals de boekhouding ze heeft aangemaakt, bijv. "DIENST01 1×, VOIP-BASIS 1×, Gesprekskosten". */
+    public static function regelsTekst(array $antwoord): string
+    {
+        $uit = [];
+        foreach ((array)($antwoord['regels'] ?? []) as $r) {
+            if (!empty($r['tekst'])) continue;
+            $aantal = (float)$r['aantal'];
+            $uit[] = ($r['artikel'] ?: mb_strimwidth((string)$r['omschrijving'], 0, 40, '…')) . ' ' . rtrim(rtrim(number_format($aantal, 2, ',', ''), '0'), ',') . '×';
+        }
+        return implode(', ', $uit);
+    }
+
+    public static function http(string $methode, string $actie, ?array $body = null, array $query = []): array
     {
         $url = rtrim(self::instelling('boekhouding_url'), '/');
         if ($url === '') throw new RuntimeException('Vul het adres van de boekhouding in.');
         if (!preg_match('#^https?://#i', $url)) throw new RuntimeException('Het adres van de boekhouding moet met https:// beginnen.');
         if (!str_ends_with(strtolower(parse_url($url, PHP_URL_PATH) ?? ''), '.php')) $url .= '/api.php';
-        $url .= (str_contains($url, '?') ? '&' : '?') . 'actie=' . rawurlencode($actie);
+        $url .= (str_contains($url, '?') ? '&' : '?') . http_build_query(['actie' => $actie] + $query);
         $sleutel = self::instelling('boekhouding_api_key');
         $headers = ['Authorization: Bearer ' . $sleutel, 'X-Api-Key: ' . $sleutel, 'Accept: application/json'];
         $json = $body !== null ? json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;

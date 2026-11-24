@@ -103,6 +103,10 @@ class SettingsController extends BaseController
             if ($a['ok'] ?? false) {
                 $this->flash('success', 'Verbinding met de boekhouding van <strong>' . sanitize((string)($a['bedrijf'] ?? '')) . '</strong> werkt (versie '
                     . sanitize((string)($a['versie'] ?? '?')) . ').');
+                [$problemen, $artikelen] = Boekhouding::controleerArtikelen();
+                if ($problemen) $this->flash('warning', 'Artikelen: ' . sanitize(implode(' ', $problemen)));
+                elseif ($artikelen) $this->flash('success', 'Artikelen gevonden in de boekhouding: ' . sanitize(implode(', ', array_map(
+                    fn($c, $x) => "$c (" . $x['omschrijving'] . ($x['prijs'] !== null ? ', € ' . number_format($x['prijs'], 2, ',', '.') : '') . ')', array_keys($artikelen), $artikelen))) . '.');
             } else {
                 $this->flash('danger', 'Boekhouding antwoordt: ' . sanitize((string)($a['melding'] ?? 'onbekende fout')));
             }

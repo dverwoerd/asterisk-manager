@@ -409,9 +409,9 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Artikelcode in de boekhouding (optioneel)</label>
+                        <label>Artikel voor de regel met gesprekskosten (optioneel, meestal leeg)</label>
                         <input type="text" name="boekhouding_artikel" class="form-control mono" value="<?= sanitize($bk('boekhouding_artikel')) ?>"
-                               placeholder="bijv. TEL-GESPREK: omzetrekening en BTW komen dan van dat artikel">
+                               placeholder="leeg = BTW hierboven; bijv. TEL-GESPREK: omzetrekening en BTW van dat artikel">
                     </div>
                     <div class="form-group">
                         <label>Vaste artikelen bovenaan elke factuur (optioneel)</label>

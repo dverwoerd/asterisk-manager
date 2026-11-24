@@ -173,6 +173,7 @@ class GesprekspecificatiesController extends BaseController
                     . ' ' . sanitize($a['actie'] ?? 'aangemaakt') . ' in de boekhouding (€ '
                     . number_format((float)$a['totaal_incl'], 2, ',', '.') . ' incl. BTW)'
                     . (!empty($a['gemaild']) ? ' en gemaild.' : '.')
+                    . (Boekhouding::regelsTekst($a) !== '' ? '<br>Regels: ' . sanitize(Boekhouding::regelsTekst($a)) : '')
                     . (isset($a['mail_fout']) ? ' Mailen mislukt: ' . sanitize($a['mail_fout']) : ''));
             } else {
                 $this->flash(($a['reden'] ?? '') === 'bestaat_al' ? 'warning' : 'danger', $naam . ': ' . sanitize((string)($a['melding'] ?? 'onbekende fout')));
