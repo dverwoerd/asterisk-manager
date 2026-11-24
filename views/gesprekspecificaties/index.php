@@ -87,7 +87,8 @@
             <tbody>
                 <?php foreach ($overzicht as $r): ?>
                 <tr>
-                    <td><strong><?= sanitize($r['naam']) ?></strong></td>
+                    <td><strong><?= sanitize($r['naam']) ?></strong>
+                        <?php if (!empty($r['toestellen'])): ?><br><span class="text-muted" style="font-size:12px"><?= (int)$r['toestellen'] ?> toestel<?= $r['toestellen'] == 1 ? '' : 'len' ?></span><?php endif; ?></td>
                     <td class="text-right mono"><?= number_format($r['aantal']) ?></td>
                     <td class="text-right mono"><?= formatDuration($r['totaal_sec']) ?></td>
                     <td class="text-right mono">

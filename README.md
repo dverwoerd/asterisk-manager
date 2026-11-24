@@ -35,7 +35,10 @@ De gespreksspecificaties kunnen per klant en maand als factuur naar de boekhoudi
 - De boekhouding maakt een factuur (concept of definitief, instelbaar) met de specificatie-PDF als bijlage; die gaat mee met de factuurmail.
 - Klanten worden gekoppeld via `asterisk:klant:<id>` (en anders BTW-nummer, e-mail of naam) en zo nodig aangemaakt.
 - Opnieuw versturen vervangt de conceptfactuur van dezelfde klant en maand. Een definitieve factuur alleen na bevestiging.
-- Regels: één bedragregel met per categorie een tekstregel, of een bedragregel per categorie (instelbaar).
+- Regels: één regel met het totaal van de gesprekskosten (de specificatie staat in de PDF-bijlage), of een bedragregel per categorie (instelbaar).
+- Toestellen: vul bij Settings > Boekhouding een artikelcode in (bijv. `TOESTEL`, aangemaakt in de boekhouding met prijs en BTW). Elke factuur
+  krijgt dan een regel met als aantal het aantal toestellen van de klant (toestelnummers bij Customers; uitgeschakelde extensies tellen niet mee).
+  Omschrijving optioneel met `{maand}`, `{aantal}` en `{toestellen}`. Klanten zonder gesprekken krijgen dan alleen de toestelregel.
 - Status per klant staat in de kolom *Boekhouding* (tabel `boekhouding_facturen`, wordt automatisch aangemaakt).
 - Automatisch elke maand (vink aan in Settings > Boekhouding), cronjob op de 1e:
 

@@ -43,10 +43,13 @@ class GesprekspecificatiesController extends BaseController
              FROM customers WHERE active=1 ORDER BY company_name, contact_name"
         );
 
+        require_once APP_ROOT . '/includes/Boekhouding.php';
+        $metToestellen = Boekhouding::ingesteld() && Boekhouding::instelling('boekhouding_toestel_artikel') !== '';
         $overzicht = [];
         foreach ($customers as $c) {
             $calls = $this->fetchCalls($c, $dateFrom, $dateTo);
-            if (empty($calls)) continue;
+            $toestellen = $metToestellen ? count(Boekhouding::toestellen($c)) : null;
+            if (empty($calls) && !$toestellen) continue;
 
             $overzicht[] = [
                 'id'               => $c['id'],
@@ -56,6 +59,7 @@ class GesprekspecificatiesController extends BaseController
                 'totaal_min'       => array_sum(array_column($calls, 'minuten')),
                 'totaal_kosten'    => self::somKosten($calls),
                 'zonder_tarief'    => count(array_filter($calls, fn($x) => !$x['tarief_bekend'])),
+                'toestellen'       => $toestellen,
                 'maand'            => $maand,
                 'dateFrom'         => $dateFrom,
                 'dateTo'           => $dateTo,

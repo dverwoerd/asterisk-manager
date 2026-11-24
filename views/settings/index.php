@@ -389,7 +389,7 @@
                         <div class="form-group">
                             <label>Factuurregels</label>
                             <select name="boekhouding_regels" class="form-control">
-                                <option value="totaal" <?= $bk('boekhouding_regels', 'totaal') === 'totaal' ? 'selected' : '' ?>>Eén bedrag + tekstregel per categorie</option>
+                                <option value="totaal" <?= $bk('boekhouding_regels', 'totaal') === 'totaal' ? 'selected' : '' ?>>Eén regel met het totaal (specificatie in de PDF)</option>
                                 <option value="categorie" <?= $bk('boekhouding_regels') === 'categorie' ? 'selected' : '' ?>>Een bedragregel per categorie</option>
                             </select>
                         </div>
@@ -412,6 +412,20 @@
                         <label>Artikelcode in de boekhouding (optioneel)</label>
                         <input type="text" name="boekhouding_artikel" class="form-control mono" value="<?= sanitize($bk('boekhouding_artikel')) ?>"
                                placeholder="bijv. TEL-GESPREK: omzetrekening en BTW komen dan van dat artikel">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Artikelcode voor toestellen (optioneel)</label>
+                            <input type="text" name="boekhouding_toestel_artikel" class="form-control mono" value="<?= sanitize($bk('boekhouding_toestel_artikel')) ?>"
+                                   placeholder="bijv. TOESTEL">
+                            <small class="text-muted">Voegt een regel toe met als aantal het aantal toestellen van de klant (uit Customers). Prijs, BTW en omzetrekening komen van het artikel in de boekhouding.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Omschrijving toestelregel (optioneel)</label>
+                            <input type="text" name="boekhouding_toestel_omschrijving" class="form-control" value="<?= sanitize($bk('boekhouding_toestel_omschrijving')) ?>"
+                                   placeholder="leeg = omschrijving van het artikel">
+                            <small class="text-muted">{maand}, {aantal} en {toestellen} worden ingevuld, bijv. "Toestellen {maand} ({toestellen})".</small>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="boekhouding_pdf" value="1" <?= $bk('boekhouding_pdf', '1') === '1' ? 'checked' : '' ?>> Specificatie-PDF meesturen als bijlage</label>

@@ -10,7 +10,9 @@
 //   boekhouding_url          https://.../boekhouding/api.php
 //   boekhouding_api_key      sleutel uit de boekhouding (tandwiel > Bedrijfsgegevens > Koppeling)
 //   boekhouding_status       boekhouding | concept | definitief | definitief_mailen
-//   boekhouding_regels       totaal (1 bedragregel + tekstregels per categorie) | categorie (bedragregel per categorie)
+//   boekhouding_regels       totaal (1 bedragregel, specificatie alleen in de PDF) | categorie (bedragregel per categorie)
+//   boekhouding_toestel_artikel     artikelcode in de boekhouding voor toestellen; aantal = toestellen van de klant (leeg = geen regel)
+//   boekhouding_toestel_omschrijving omschrijving van die regel, {maand} {aantal} {toestellen} (leeg = omschrijving van het artikel)
 //   boekhouding_omschrijving tekst van de factuurregel, {maand} = "november 2026"
 //   boekhouding_btw          VH (21%), VL, V0, VV, VEU, VEX
 //   boekhouding_artikel      optioneel: artikelcode in de boekhouding (omzetrekening en BTW komen dan daarvandaan)
@@ -86,6 +88,35 @@ class Boekhouding
     /**
      * Bouwt het bericht voor de boekhouding uit een specificatie (GesprekspecificatiesController::bouwSpecificatie).
      */
+    /** Toestellen (extensies) van een klant: de toestelnummers uit de klantkaart die als extensie bestaan en aan staan. */
+    public static function toestellen(array $customer): array
+    {
+        $lijst = array_values(array_unique(array_filter(array_map('trim', explode(',', (string)($customer['extensions_csv'] ?? ''))))));
+        if (!$lijst) return [];
+        try {
+            $ph = implode(',', array_fill(0, count($lijst), '?'));
+            $bestaand = array_column(Database::fetchAll("SELECT extension FROM extensions WHERE extension IN ($ph) AND enabled = 1", $lijst), 'extension');
+            $alle = array_column(Database::fetchAll("SELECT extension FROM extensions WHERE extension IN ($ph)", $lijst), 'extension');
+            // toestelnummers die niet in de extensielijst staan (bijv. extern beheerd) tellen ook mee; uitgeschakelde niet
+            $lijst = array_values(array_filter($lijst, fn($e) => in_array($e, $bestaand, true) || !in_array($e, $alle, true)));
+        } catch (Exception $e) {
+            // extensietabel niet beschikbaar: de klantkaart is leidend
+        }
+        sort($lijst, SORT_NATURAL);
+        return $lijst;
+    }
+
+    /** Factuurregel voor de toestellen, of null als er geen toestelartikel is ingesteld of de klant geen toestellen heeft. */
+    public static function toestelRegel(array $customer, string $maand): ?array
+    {
+        $art = self::instelling('boekhouding_toestel_artikel');
+        $toestellen = self::toestellen($customer);
+        if ($art === '' || !$toestellen) return null;
+        $oms = strtr(self::instelling('boekhouding_toestel_omschrijving'), [
+            '{maand}' => self::maandLabel($maand), '{aantal}' => (string)count($toestellen), '{toestellen}' => implode(', ', $toestellen)]);
+        return array_filter(['omschrijving' => trim($oms), 'artikel' => $art, 'aantal' => count($toestellen)], fn($v) => $v !== '');
+    }
+
     public static function bericht(array $customer, string $maand, array $spec, ?string $pdf = null, bool $overschrijven = false): array
     {
         $label = self::maandLabel($maand);
@@ -114,12 +145,12 @@ class Boekhouding
             }
             if (!$regels) $regels[] = $regel($oms, 0);
         } else {
-            $regels[] = $regel($oms . ' (zie specificatie)', $totaal);
-            foreach ($spec['categorieen'] as $cat => $c) {
-                if ($c['aantal'] === 0) continue;
-                $regels[] = ['omschrijving' => "$cat: " . $gespr($c['aantal']) . ", {$c['minuten']} min, " . self::euro($c['kosten']), 'tekst' => true];
-            }
+            $regels[] = $regel($oms, $totaal);   // de specificatie zelf staat in de PDF-bijlage
         }
+        // geen gesprekskosten: geen gespreksregel (tenzij "ook € 0,00 versturen" aan staat)
+        if ($totaal == 0 && self::instelling('boekhouding_nul') !== '1') $regels = [];
+        if ($t = self::toestelRegel($customer, $maand)) $regels[] = $t;
+        if (!$regels) $regels[] = $regel($oms, 0);
 
         $naam = trim((string)($customer['company_name'] ?: $customer['contact_name']));
         $adres = trim(preg_replace('/\s*\R\s*/', ', ', (string)($customer['address'] ?? '')));
@@ -162,12 +193,13 @@ class Boekhouding
         require_once APP_ROOT . '/controllers/GesprekspecificatiesController.php';
         $spec = (new GesprekspecificatiesController())->specificatieVoor($customer, $maand);
 
-        if ($spec['totaal']['aantal'] === 0 || (round($spec['totaal']['kosten'], 2) == 0 && self::instelling('boekhouding_nul') !== '1')) {
+        $geenGesprekken = $spec['totaal']['aantal'] === 0 || (round($spec['totaal']['kosten'], 2) == 0 && self::instelling('boekhouding_nul') !== '1');
+        if ($geenGesprekken && !self::toestelRegel($customer, $maand)) {
             return ['ok' => true, 'overgeslagen' => true, 'melding' => 'Geen kosten in ' . self::maandLabel($maand) . '; niet verstuurd.'];
         }
 
         $pdf = null;
-        if (self::instelling('boekhouding_pdf', '1') === '1') {
+        if (self::instelling('boekhouding_pdf', '1') === '1' && $spec['totaal']['aantal'] > 0) {
             require_once APP_ROOT . '/includes/GesprekPDF.php';
             $pdf = GesprekPDF::maak($customer, GesprekspecificatiesController::bedrijf(), ucfirst(self::maandLabel($maand)), $spec)->Output('', 'S');
         }
