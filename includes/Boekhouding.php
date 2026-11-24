@@ -11,7 +11,8 @@
 //   boekhouding_api_key      sleutel uit de boekhouding (tandwiel > Bedrijfsgegevens > Koppeling)
 //   boekhouding_status       boekhouding | concept | definitief | definitief_mailen
 //   boekhouding_regels       totaal (1 bedragregel, specificatie alleen in de PDF) | categorie (bedragregel per categorie)
-//   boekhouding_toestel_artikel     artikelcode in de boekhouding voor toestellen; aantal = toestellen van de klant (leeg = geen regel)
+//   boekhouding_toestel_artikel       artikelcode voor het eerste toestel (bijv. VOIP-BASIS; leeg = geen toestelregels)
+//   boekhouding_toestel_extra_artikel artikelcode voor elk volgend toestel (bijv. VOIP-EXTRA; leeg = basisartikel x aantal)
 //   boekhouding_toestel_omschrijving omschrijving van die regel, {maand} {aantal} {toestellen} (leeg = omschrijving van het artikel)
 //   boekhouding_omschrijving tekst van de factuurregel, {maand} = "november 2026"
 //   boekhouding_btw          VH (21%), VL, V0, VV, VEU, VEX
@@ -106,15 +107,27 @@ class Boekhouding
         return $lijst;
     }
 
-    /** Factuurregel voor de toestellen, of null als er geen toestelartikel is ingesteld of de klant geen toestellen heeft. */
-    public static function toestelRegel(array $customer, string $maand): ?array
+    /**
+     * Factuurregels voor de toestellen:
+     *   1 toestel       -> 1 x basisartikel (bijv. VOIP-BASIS)
+     *   n toestellen    -> 1 x basisartikel + (n-1) x extra-artikel (bijv. VOIP-EXTRA)
+     * Zonder extra-artikel: n x basisartikel. Leeg als er geen basisartikel is ingesteld of de klant geen toestellen heeft.
+     */
+    public static function toestelRegels(array $customer, string $maand): array
     {
-        $art = self::instelling('boekhouding_toestel_artikel');
+        $basis = self::instelling('boekhouding_toestel_artikel');
+        $extra = self::instelling('boekhouding_toestel_extra_artikel');
         $toestellen = self::toestellen($customer);
-        if ($art === '' || !$toestellen) return null;
-        $oms = strtr(self::instelling('boekhouding_toestel_omschrijving'), [
-            '{maand}' => self::maandLabel($maand), '{aantal}' => (string)count($toestellen), '{toestellen}' => implode(', ', $toestellen)]);
-        return array_filter(['omschrijving' => trim($oms), 'artikel' => $art, 'aantal' => count($toestellen)], fn($v) => $v !== '');
+        if ($basis === '' || !$toestellen) return [];
+        $regel = function (string $artikel, array $nummers) use ($maand): array {
+            $oms = strtr(self::instelling('boekhouding_toestel_omschrijving'), [
+                '{maand}' => self::maandLabel($maand), '{aantal}' => (string)count($nummers), '{toestellen}' => implode(', ', $nummers)]);
+            return array_filter(['omschrijving' => trim($oms), 'artikel' => $artikel, 'aantal' => count($nummers)], fn($v) => $v !== '');
+        };
+        if ($extra === '') return [$regel($basis, $toestellen)];
+        $uit = [$regel($basis, [array_shift($toestellen)])];
+        if ($toestellen) $uit[] = $regel($extra, $toestellen);
+        return $uit;
     }
 
     public static function bericht(array $customer, string $maand, array $spec, ?string $pdf = null, bool $overschrijven = false): array
@@ -149,7 +162,7 @@ class Boekhouding
         }
         // geen gesprekskosten: geen gespreksregel (tenzij "ook € 0,00 versturen" aan staat)
         if ($totaal == 0 && self::instelling('boekhouding_nul') !== '1') $regels = [];
-        if ($t = self::toestelRegel($customer, $maand)) $regels[] = $t;
+        foreach (self::toestelRegels($customer, $maand) as $t) $regels[] = $t;
         if (!$regels) $regels[] = $regel($oms, 0);
 
         $naam = trim((string)($customer['company_name'] ?: $customer['contact_name']));
@@ -194,7 +207,7 @@ class Boekhouding
         $spec = (new GesprekspecificatiesController())->specificatieVoor($customer, $maand);
 
         $geenGesprekken = $spec['totaal']['aantal'] === 0 || (round($spec['totaal']['kosten'], 2) == 0 && self::instelling('boekhouding_nul') !== '1');
-        if ($geenGesprekken && !self::toestelRegel($customer, $maand)) {
+        if ($geenGesprekken && !self::toestelRegels($customer, $maand)) {
             return ['ok' => true, 'overgeslagen' => true, 'melding' => 'Geen kosten in ' . self::maandLabel($maand) . '; niet verstuurd.'];
         }
 

@@ -415,11 +415,19 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Artikelcode voor toestellen (optioneel)</label>
+                            <label>Artikel eerste toestel (optioneel)</label>
                             <input type="text" name="boekhouding_toestel_artikel" class="form-control mono" value="<?= sanitize($bk('boekhouding_toestel_artikel')) ?>"
-                                   placeholder="bijv. TOESTEL">
-                            <small class="text-muted">Voegt een regel toe met als aantal het aantal toestellen van de klant (uit Customers). Prijs, BTW en omzetrekening komen van het artikel in de boekhouding.</small>
+                                   placeholder="bijv. VOIP-BASIS">
+                            <small class="text-muted">Klant met 1 toestel: 1 × dit artikel. Prijs, BTW en omzetrekening komen van het artikel in de boekhouding.</small>
                         </div>
+                        <div class="form-group">
+                            <label>Artikel extra toestellen (optioneel)</label>
+                            <input type="text" name="boekhouding_toestel_extra_artikel" class="form-control mono" value="<?= sanitize($bk('boekhouding_toestel_extra_artikel')) ?>"
+                                   placeholder="bijv. VOIP-EXTRA">
+                            <small class="text-muted">Klant met meerdere toestellen: 1 × eerste-toestelartikel + dit artikel voor elk volgend toestel. Leeg = eerste-toestelartikel × aantal.</small>
+                        </div>
+                    </div>
+                    <div class="form-row">
                         <div class="form-group">
                             <label>Omschrijving toestelregel (optioneel)</label>
                             <input type="text" name="boekhouding_toestel_omschrijving" class="form-control" value="<?= sanitize($bk('boekhouding_toestel_omschrijving')) ?>"
