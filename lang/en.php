@@ -53,6 +53,7 @@ return [
     'nav_queues'       => 'Queues',
     'nav_ring_groups'  => 'Ring Groups',
     'nav_call_acl'     => 'Call permissions',
+    'nav_softphone'    => 'Pair softphone',
     'nav_dialplan'     => 'Dialplan',
     'nav_inbound'      => 'Inbound Routes',
     'nav_outbound'     => 'Outbound Routes',

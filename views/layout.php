@@ -50,6 +50,9 @@
         <a href="?page=call_acl" class="nav-item<?= activeNav('call_acl') ?>">
             <span class="nav-icon">⛨</span><span class="nav-label"><?= t('nav_call_acl') ?></span>
         </a>
+        <a href="?page=softphone" class="nav-item<?= activeNav('softphone') ?>">
+            <span class="nav-icon">☎</span><span class="nav-label"><?= t('nav_softphone') ?></span>
+        </a>
 
         <div class="nav-section-label">ROUTING</div>
         <a href="?page=inbound_routes" class="nav-item<?= activeNav('inbound_routes') ?>">

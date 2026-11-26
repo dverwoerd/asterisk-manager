@@ -42,7 +42,7 @@ if (empty($_SESSION['csrf_token'])) {
 $page   = $_GET['page'] ?? 'dashboard';
 $action = $_GET['action'] ?? 'index';
 
-if ($page !== 'login' && $page !== 'logout' && !($page === 'phonebook' && $action === 'xml') && !($page === 'sounds' && $action === 'list') && !isLoggedIn()) {
+if ($page !== 'login' && $page !== 'logout' && !($page === 'phonebook' && $action === 'xml') && !($page === 'softphone' && $action === 'config') && !($page === 'sounds' && $action === 'list') && !isLoggedIn()) {
     redirect('?page=login');
 }
 
@@ -56,6 +56,7 @@ $routes = [
     'customers'       => 'CustomersController',
     'tarieven'        => 'TarievenController',
     'call_acl'        => 'CallAclController',
+    'softphone'       => 'SoftphoneController',
     'dialplan'        => 'DialplanController',
     'inbound_routes'  => 'InboundRoutesController',
     'outbound_routes' => 'OutboundRoutesController',
