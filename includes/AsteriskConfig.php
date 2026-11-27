@@ -506,7 +506,8 @@ class AsteriskConfig
             // Doorschakelingen gaan naar buiten met het eigen nummer van het toestel als CLI.
             // Anders krijgt de provider het nummer van de oorspronkelijke beller te zien en wijst die het af.
             $ownCid   = preg_replace('/[^0-9+]/', '', (string)($ext['callerid_number'] ?? ''));
-            $cidLine  = $ownCid !== '' ? ' same => n,Set(CALLERID(num)=' . $ownCid . ")\n" : '';
+            $cidLine  = ' same => n,ExecIf($["${INBOUND_DID}" != ""]?Set(CALLERID(num)=${INBOUND_DID})'
+                      . ($ownCid !== '' ? ':Set(CALLERID(num)=' . $ownCid . ')' : '') . ")\n";
 
             $out .= 'exten => ' . $exten . ",1,NoOp(Call to extension " . $exten . ")\n";
             $out .= $this->aclCheckLines($exten, $aclActive);
@@ -763,6 +764,11 @@ class AsteriskConfig
             $out .= ' same => n,Set(PJSIP_HEADER(add,X-Did-Label)=' . $didLabelShort . ")\n";
             $out .= ' same => n,Set(CONNECTEDLINE(name)=${CALLERID(num)} > ' . $didLabelShort . ")\n";
             $out .= ' same => n,Set(__FROM_DID=1)' . "\n";
+            // Het gebelde nummer is van ons: dat is het CLI voor doorschakelingen naar buiten
+            $didDigits = preg_replace('/\D/', '', (string)$did);
+            if ($didDigits !== '' && strlen($didDigits) >= 9) {
+                $out .= ' same => n,Set(__INBOUND_DID=' . $didDigits . ")\n";
+            }
             $out .= " same => n,Answer()\n";
             $out .= $this->destinationLine($route['destination_type'], $route['destination']);
             $out .= " same => n,Hangup()\n\n";
@@ -878,7 +884,8 @@ class AsteriskConfig
             'queue'        => " same => n,Queue(" . $dest . ",tT)\n",
             'ring_group'   => " same => n,Goto(from-internal," . $dest . ",1)\n",
             'voicemail'    => " same => n,VoiceMail(" . $dest . "@default,u)\n",
-            'external'     => " same => n,Dial(Local/" . $dest . "@from-internal,60,tT)\n",
+            'external'     => " same => n,ExecIf(\$[\"\${INBOUND_DID}\" != \"\"]?Set(CALLERID(num)=\${INBOUND_DID}))\n"
+                            . " same => n,Dial(Local/" . $dest . "@from-internal,60,tT)\n",
             'announcement' => " same => n,Playback(" . $dest . ")\n same => n,Hangup()\n",
             default        => " same => n,Hangup()\n",
         };
