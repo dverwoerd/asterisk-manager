@@ -503,6 +503,10 @@ class AsteriskConfig
             $cfNoAns  = trim($ext['cf_noanswer'] ?? '');
             $cfVm     = !empty($ext['cf_voicemail']);
             $ringTime = (int)($ext['ring_time'] ?? 20);
+            // Doorschakelingen gaan naar buiten met het eigen nummer van het toestel als CLI.
+            // Anders krijgt de provider het nummer van de oorspronkelijke beller te zien en wijst die het af.
+            $ownCid   = preg_replace('/[^0-9+]/', '', (string)($ext['callerid_number'] ?? ''));
+            $cidLine  = $ownCid !== '' ? ' same => n,Set(CALLERID(num)=' . $ownCid . ")\n" : '';
 
             $out .= 'exten => ' . $exten . ",1,NoOp(Call to extension " . $exten . ")\n";
             $out .= $this->aclCheckLines($exten, $aclActive);
@@ -519,32 +523,38 @@ class AsteriskConfig
 
             // Altijd doorschakelen
             if (!empty($cfAlways)) {
+                $out .= $cidLine;
                 $out .= ' same => n,Dial(Local/' . $cfAlways . "@from-internal,60,tT)\n";
                 $out .= " same => n,Hangup()\n";
                 $out .= $this->presenceBranches($ext, $awayFwd, $oooFwd) . "\n";
                 continue;
             }
 
-            // Normaal bellen met busy/noanswer handling
+            // Normaal bellen. Doorschakelen alleen op basis van DIALSTATUS: een beantwoord gesprek
+            // eindigt hier, bezet gaat naar de bezet-bestemming, de rest naar geen-antwoord.
             $dialOpts = 'tTr';
-            if (!empty($cfBusy)) $dialOpts .= 'j'; // j = jump on busy
             $out .= ' same => n,Dial(PJSIP/' . $exten . ',' . $ringTime . ',' . $dialOpts . ")\n";
-
-            // Bij bezet
+            $out .= ' same => n,GotoIf($["${DIALSTATUS}" = "ANSWER"]?done' . $exten . ')' . "\n";
             if (!empty($cfBusy)) {
-                $out .= ' same => n(busy),Dial(Local/' . $cfBusy . "@from-internal,60,tT)\n";
+                $out .= ' same => n,GotoIf($["${DIALSTATUS}" = "BUSY"]?busy' . $exten . ')' . "\n";
             }
 
             // Bij geen antwoord - extern of voicemail
             if (!empty($cfNoAns)) {
+                $out .= $cidLine;
                 $out .= ' same => n,Dial(Local/' . $cfNoAns . "@from-internal,60,tT)\n";
-            } elseif ($cfVm && $vmOn) {
-                $out .= $this->voicemailDialLine($exten, $ext['voicemail_greeting'] ?? '');
             } elseif ($vmOn) {
                 $out .= $this->voicemailDialLine($exten, $ext['voicemail_greeting'] ?? '');
             }
+            $out .= ' same => n(done' . $exten . "),Hangup()\n";
 
-            $out .= " same => n,Hangup()\n";
+            // Bij bezet
+            if (!empty($cfBusy)) {
+                $out .= ' same => n(busy' . $exten . '),NoOp(Bezet: doorschakelen)' . "\n";
+                $out .= $cidLine;
+                $out .= ' same => n,Dial(Local/' . $cfBusy . "@from-internal,60,tT)\n";
+                $out .= " same => n,Hangup()\n";
+            }
             $out .= $this->presenceBranches($ext, $awayFwd, $oooFwd) . "\n";
         }
 
