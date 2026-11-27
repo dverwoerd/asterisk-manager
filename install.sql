@@ -167,6 +167,7 @@ CREATE TABLE inbound_routes (
     description VARCHAR(128),
     destination_type ENUM('extension','queue','ring_group','voicemail','ivr','external','hangup','announcement') DEFAULT 'extension',
     destination VARCHAR(64) NOT NULL,
+    outbound_trunk_id INT NULL DEFAULT NULL,
     time_group_id INT DEFAULT NULL,
     priority INT DEFAULT 0,
     notes TEXT,

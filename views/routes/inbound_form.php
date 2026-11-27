@@ -67,6 +67,16 @@
                 </div>
             </div>
             <div class="form-group">
+                <label>Uitgaande trunk voor doorschakelingen</label>
+                <select name="outbound_trunk_id" class="form-control">
+                    <option value="0">Standaard (volgens uitgaande route)</option>
+                    <?php foreach (Database::fetchAll("SELECT id,name,username FROM trunks WHERE enabled=1 ORDER BY name") as $tr): ?>
+                    <option value="<?= $tr['id'] ?>" <?= (int)($route['outbound_trunk_id'] ?? 0)===(int)$tr['id']?'selected':'' ?>><?= sanitize($tr['name']) ?> (<?= sanitize($tr['username']) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+                <small class="form-hint">Doorschakelen naar buiten gaat via dit SIP-account, nodig als dit nummer bij een ander account hoort.</small>
+            </div>
+            <div class="form-group">
                 <label>Priority</label>
                 <input type="number" name="priority" class="form-control" value="<?= (int)$route['priority'] ?>" min="0" max="99">
                 <small class="form-hint">Higher priority routes are matched first (0 = lowest)</small>

@@ -53,6 +53,7 @@ class InboundRoutesController extends BaseController
             'description' => trim($this->post('description','')),
             'destination_type' => $this->post('destination_type','extension'),
             'destination' => trim($this->post('destination','')),
+            'outbound_trunk_id' => (int)$this->post('outbound_trunk_id',0) ?: null,
             'priority' => (int)$this->post('priority',0),
             'notes' => trim($this->post('notes','')),
             'enabled' => $this->post('enabled',0) ? 1 : 0,
@@ -61,7 +62,7 @@ class InboundRoutesController extends BaseController
     private function defaults(): array
     {
         return ['did'=>'','cid_number'=>'','description'=>'',
-                'destination_type'=>'extension','destination'=>'','priority'=>0,'notes'=>'','enabled'=>1];
+                'destination_type'=>'extension','destination'=>'','outbound_trunk_id'=>null,'priority'=>0,'notes'=>'','enabled'=>1];
     }
     private function applyAndReload(): void
     {

@@ -628,6 +628,10 @@ class AsteriskConfig
             if (empty($trunks)) continue;
             $trunkName = $trunks[0]['name'];
 
+            // Doorschakelingen van een inkomende route met eigen uitgaande trunk (INBOUND_TRUNK)
+            // gaan over die trunk/dat SIP-account, anders over de trunk van deze route.
+            $trunkSel = ' same => n,Set(OUTTRUNK=${IF($["${INBOUND_TRUNK}" != ""]?${INBOUND_TRUNK}:' . $trunkName . ')})' . "\n";
+
             foreach ($patterns as $p) {
                 $match    = trim($p['match_pattern']);
                 $prepend  = trim($p['prepend'] ?? '');
@@ -639,9 +643,11 @@ class AsteriskConfig
                 if ($prepend !== '' || $prefix !== '') {
                     $extenVar = '${EXTEN:' . $stripLen . '}';
                     $out .= ' same => n,Set(OUTNUM=' . $prepend . $extenVar . ")\n";
-                    $out .= ' same => n,Dial(PJSIP/${OUTNUM}@' . $trunkName . ",60,tT)\n";
+                    $out .= $trunkSel;
+                    $out .= ' same => n,Dial(PJSIP/${OUTNUM}@${OUTTRUNK},60,tT)' . "\n";
                 } else {
-                    $out .= ' same => n,Dial(PJSIP/${EXTEN}@' . $trunkName . ",60,tT)\n";
+                    $out .= $trunkSel;
+                    $out .= ' same => n,Dial(PJSIP/${EXTEN}@${OUTTRUNK},60,tT)' . "\n";
                 }
                 $out .= " same => n,Hangup()\n\n";
             }
@@ -768,6 +774,10 @@ class AsteriskConfig
             $didDigits = preg_replace('/\D/', '', (string)$did);
             if ($didDigits !== '' && strlen($didDigits) >= 9) {
                 $out .= ' same => n,Set(__INBOUND_DID=' . $didDigits . ")\n";
+            }
+            if (!empty($route['outbound_trunk_id'])) {
+                $tr = Database::fetchOne("SELECT name FROM trunks WHERE id=?", [(int)$route['outbound_trunk_id']]);
+                if ($tr) $out .= ' same => n,Set(__INBOUND_TRUNK=' . $tr['name'] . ")\n";
             }
             $out .= " same => n,Answer()\n";
             $out .= $this->destinationLine($route['destination_type'], $route['destination']);
