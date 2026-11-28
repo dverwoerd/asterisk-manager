@@ -428,6 +428,33 @@ class GesprekspecificatiesController extends BaseController
         unset($f);
         $rows = array_merge($rows, $fwd);
 
+        // Doorgeschakeld gesprek waarvan de duur op het inkomende been staat: de beller (of ons eigen DID als
+        // CLI) -> toestel, met 'Local/'-been naar het externe nummer dat zelf 0 s heeft. De duur van het inkomende
+        // been is dan het echte gesprek; de bestemming haal ik uit het Local-been.
+        $fwd2 = Database::fetchAll(
+            "SELECT i.calldate, i.dst AS src, f.dst, i.billsec
+             FROM cdr_records i
+             JOIN cdr_records f ON f.src = i.src
+                AND f.channel LIKE 'Local/%'
+                AND f.disposition = 'ANSWERED'
+                AND f.billsec <= 1
+                AND f.calldate BETWEEN i.calldate - INTERVAL 60 SECOND AND i.calldate + INTERVAL 60 SECOND
+                AND LENGTH(REGEXP_REPLACE(f.dst, '[^0-9]', '')) > 3
+             WHERE i.channel LIKE 'PJSIP/%'
+               AND i.dst IN ($ph)
+               AND LENGTH(REGEXP_REPLACE(i.dst, '[^0-9]', '')) <= 3
+               AND LENGTH(REGEXP_REPLACE(i.src, '[^0-9]', '')) >= 9
+               AND DATE(i.calldate) BETWEEN ? AND ?
+               AND i.disposition = 'ANSWERED'
+               AND i.billsec > 0
+             GROUP BY i.uniqueid
+             ORDER BY i.calldate",
+            [...$exts, $dateFrom, $dateTo]
+        );
+        foreach ($fwd2 as &$f) { $f['doorgeschakeld'] = true; }
+        unset($f);
+        $rows = array_merge($rows, $fwd2);
+
         // Asterisk-CDR en geimporteerde CSV-records staan in dezelfde tabel. Overlappen ze (zelfde toestel,
         // nummer en starttijd), dan telt dat gesprek maar een keer.
         $rows = $this->ontdubbel($rows);
