@@ -107,7 +107,7 @@ $eur = fn(float $v, int $d = 2) => '€ ' . number_format($v, $d, ',', '.');
                 <?php foreach ($n['calls'] as $c): ?>
                 <tr>
                     <td class="mono" style="white-space:nowrap"><?= date('d-m-Y H:i', strtotime($c['calldate'])) ?></td>
-                    <td class="mono">Toestel <?= sanitize($c['src']) ?><?= !empty($c['doorgeschakeld']) ? ' (doorgeschakeld)' : '' ?></td>
+                    <td class="mono"><?= !empty($c['doorgeschakeld']) ? 'Doorgeschakeld' : 'Toestel ' . sanitize($c['src']) ?></td>
                     <td class="text-center mono"><?= $dur((int)$c['billsec']) ?></td>
                     <td class="text-center mono"><?= (int)$c['minuten'] ?></td>
                     <td class="text-right mono"><?= $eur($c['kosten'], 4) ?></td>
